@@ -42,7 +42,7 @@ from flask import (
     Response,
 )
 from Utilities_Main import SumAndSave
-
+from Utilities_Architecture import log_to_api, get_new_runid, save_outcome_data
 logging.basicConfig(
     level=logging.DEBUG
 )  # Configures logging to display all debug messages
@@ -63,6 +63,7 @@ def sum_and_save_route():
     Returns:
     - JSON response containing the arguments and the result of the summation.
     """
+    id_script = 1
     try:
         arg1 = request.args.get("arg1", type=float)
         arg2 = request.args.get("arg2", type=float)
@@ -72,7 +73,29 @@ def sum_and_save_route():
         if arg1 is None or arg2 is None:
             return jsonify({"error": "arg1 and arg2 are required parameters"}), 400
 
-        result = SumAndSave(arg1, arg2, FatherRunID, use_db)
+        new_run_id = None
+        if use_db:
+            new_run_id_response = get_new_runid(id_script, FatherRunid=FatherRunID) if FatherRunID else get_new_runid(id_script)
+
+            if 'error' in new_run_id_response:
+                error_message = new_run_id_response.get('error', 'Unknown error occurred while creating new run ID.')
+                error_details = new_run_id_response.get('details', 'No additional details provided.')
+                log_to_api(id_run=None, log_message=f"Error creating new run ID: {error_message}. Details: {error_details}", debug=True, error=True)
+                return jsonify(new_run_id_response), 500
+
+            new_run_id = new_run_id_response.get('id_run')
+
+        input_arguments = {
+            "arg1": arg1,
+            "arg2": arg2,
+            "FatherRunID": FatherRunID,
+            "use_db": use_db
+        }
+
+        if use_db and new_run_id:
+            save_outcome_data(new_run_id, 0, 0, v_jsonb=input_arguments)
+            log_to_api(id_run=new_run_id, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db)
+        result = SumAndSave(arg1, arg2, new_run_id, use_db)
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500

@@ -71,17 +71,19 @@ def log_to_api(id_run, log_message, debug=False, warning=False, error=False, use
     else:
         print(log_message_with_timestamp)
 
-def get_new_runid(idscript, id_category=None, FatherRunid=None):
+def get_new_runid(idscript, id_user, father_service_id=None, id_category=None, FatherRunid=None):
     """
-    Generates a new run ID by sending a request to a specific endpoint with the script ID
-    and optional parent run ID. It fetches the script's category and type by ID, logs the operation,
-    and handles the creation of a new run ID.
+    Generates a new run ID by sending a request to a specific endpoint with the script ID,
+    user ID, optional parent run ID, and optional father service ID. It fetches the script's
+    category and type by ID, logs the operation, and handles the creation of a new run ID.
 
     The method logs both the operation's initiation and its outcome (success or failure).
     If successful, it returns the new run ID; otherwise, it logs the error and returns the error details.
 
     Args:
         idscript (int): The unique identifier for the script whose run ID is being created.
+        id_user (int): The unique identifier for the user.
+        father_service_id (int, optional): The identifier of the father service. Required if FatherRunid is provided.
         id_category (int, optional): The category ID of the script. If not provided, a default value is used.
         FatherRunid (str, optional): The run ID of the parent operation, if applicable.
 
@@ -89,8 +91,15 @@ def get_new_runid(idscript, id_category=None, FatherRunid=None):
         dict: The new run ID if the creation was successful; otherwise, a dictionary with error details.
 
     Raises:
-        Requests exceptions are caught and logged but not explicitly raised further.
+        ValueError: If required arguments are not provided.
     """
+    # Validate required arguments
+    if id_user is None:
+        raise ValueError("id_user is required and cannot be None")
+
+    if FatherRunid is not None and father_service_id is None:
+        raise ValueError("father_service_id is required if FatherRunid is provided")
+
     # Ensure get_data_type returns a dictionary or handle it appropriately here
     data_type = get_data_type(id_category if id_category is not None else 0, idscript)
     
@@ -108,6 +117,8 @@ def get_new_runid(idscript, id_category=None, FatherRunid=None):
     # Prepare the payload for the POST request
     payload = {
         'id_script': idscript,
+        'id_user': id_user,
+        'father_service_id': father_service_id,
         'id_run_father': FatherRunid
     }
 
