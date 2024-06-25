@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API Documentation Template</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
+</head>
+
+<body>
+    <h1>API Documentation</h1>
+    <h2>Available Routes:</h2>
+
+    <!-- Example route documentation structure -->
+    <h3>1. GET /example_route</h3>
+    <p><b class="important">Description:</b> Brief description of the route</p>
+    <p><b class="important">Parameters:</b></p>
+    <ul class="indent">
+        <li><b class="parameter">param1:</b> Description of param1</li>
+        <li><b class="parameter">param2:</b> Description of param2</li>
+    </ul>
+    <p><b class="important">Examples:</b></p>
+    <ul class="indent">
+        <li class="example">Example usage of /example_route</li>
+        <li class="example">
+            /example_route?param1=value1&param2=value2
+            <a href="/download_example?address=/example_route?param1=value1&param2=value2">Download Example File</a>
+        </li>
+    </ul>
+
+    <!-- Repeat the above structure for additional routes as needed -->
+
+    <h3>2. POST /another_example_route</h3>
+    <p><b class="important">Description:</b> Brief description of the route</p>
+    <p><b class="important">Parameters:</b></p>
+    <ul class="indent">
+        <li><b class="parameter">param1:</b> Description of param1</li>
+        <li><b class="parameter">param2:</b> Description of param2</li>
+    </ul>
+    <p><b class="important">Examples:</b></p>
+    <ul class="indent">
+        <li class="example">
+            POST /another_example_route<br>
+            Body:
+            <pre>{
+    "param1": "value1",
+    "param2": "value2"
+}</pre>
+        </li>
+    </ul>
+
+    <p>Replace &lt;PORT&gt; with the actual port number on which the application is running.</p>
+</body>
+
+</html>

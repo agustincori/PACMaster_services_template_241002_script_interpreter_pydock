@@ -1,0 +1,9 @@
+Outcomes:
+- POST /insert_outcome_run:
+
+curl -X POST http://localhost:5431/insert_outcome_run -H "Content-Type: application/json" -d '{"id_run": 1, "id_category": 0, "id_type": 1, "v_integer": 100, "v_floatpoint": 1.23, "v_string": "example", "v_jsonb": {"key": "value"}, "v_boolean": true, "v_timestamp": "2024-01-01T00:00:00"}'
+Invoke-WebRequest -Uri http://localhost:5431/insert_outcome_run -Method POST -ContentType "application/json" -Body '{"id_run": 1, "id_category": 0, "id_type": 1, "v_integer": 100, "v_floatpoint": 1.23, "v_string": "example", "v_jsonb": {"key": "value"}, "v_boolean": true, "v_timestamp": "2024-01-01T00:00:00"}'
+\
+
+/getOutcome:
+Invoke-WebRequest -Uri "http://localhost:5431/getOutcome?id_run=1&id_category=0&v_string=example" -Method GET

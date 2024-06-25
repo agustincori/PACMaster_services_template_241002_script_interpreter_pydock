@@ -1,0 +1,72 @@
+body {
+    background-color: #0D0D0D;
+    /* Darker background */
+    color: #8617cf;
+    /* Light gray text */
+    font-family: Arial, sans-serif;
+    line-height: 1.6;
+}
+
+h1,
+h2,
+h3 {
+    color: #8A2BE2;
+    /* Neon purple for headers */
+}
+
+ul {
+    list-style-type: none;
+    padding-left: 0;
+}
+
+li {
+    margin-bottom: 10px;
+}
+
+pre {
+    background-color: #2a0042;
+    /* Dark background for code blocks */
+    color: #D4D4D4;
+    /* Light gray text for code */
+    padding: 10px;
+    border-radius: 5px;
+    overflow-x: auto;
+}
+
+a {
+    color: #00FFFF;
+    /* Neon cyan for links */
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.indent {
+    margin-left: 20px;
+}
+
+/* Highlight comments with a specific color */
+.comment {
+    color: #00FF00;
+    /* Neon green for comments */
+}
+
+/* Custom styling for important text */
+.important {
+    color: #960df1;
+    /* Neon yellow for important text */
+}
+
+/* Custom styling for parameters */
+.parameter {
+    color: #7633e2;
+    /* Neon orange for parameters */
+}
+
+/* Styling for examples */
+.example {
+    color: #8d42a3;
+    /* Dark cyan for examples */
+}

@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DB_Manager API Documentation</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
+</head>
+
+<body>
+    <h1>DB_Manager API</h1>
+
+    <h2>Author:</h2>
+    <p>Agustín Corigliano</p>
+
+    <h2>Version:</h2>
+    <p>1.2</p>
+
+    <h2>Logs:</h2>
+    <div class="indent">
+        <h3>1.1 POST /insert_log</h3>
+        <p><b class="important">Description:</b> Inserts a new log entry.</p>
+        <p><b class="important">Parameters:</b></p>
+        <ul class="indent">
+            <li><b class="parameter">id_run:</b> (int, required) ID of the run.</li>
+            <li><b class="parameter">log:</b> (string, required) Log message.</li>
+            <li><b class="parameter">debug:</b> (bool, optional) Debug flag.</li>
+            <li><b class="parameter">warning:</b> (bool, optional) Warning flag.</li>
+            <li><b class="parameter">error:</b> (bool, optional) Error flag.</li>
+        </ul>
+        <p><b class="important">Returns:</b> Confirmation message (201).</p>
+
+        <h3>1.2 GET /get_log_from_idrun/<int:id_run></h3>
+        <p><b class="important">Description:</b> Retrieves logs for a specific run ID.</p>
+        <p><b class="important">Parameters:</b></p>
+        <ul class="indent">
+            <li><b class="parameter">id_run:</b> (int, required) ID of the run.</li>
+        </ul>
+        <p><b class="important">Returns:</b> Array of logs (200) or error message (404).</p>
+    </div>
+
+    <h2>Outcomes:</h2>
+    <div class="indent">
+        <h3>2.1 POST /insert_outcome_run</h3>
+        <p><b class="important">Description:</b> Inserts a new outcome entry.</p>
+        <p><b class="important">Parameters:</b></p>
+        <ul class="indent">
+            <li><b class="parameter">id_run:</b> (int, required) ID of the run.</li>
+            <li><b class="parameter">id_category:</b> (int, required) Category ID.</li>
+            <li><b class="parameter">id_type:</b> (int, required) Type ID.</li>
+            <li><b class="parameter">v_integer:</b> (int, optional) Integer value.</li>
+            <li><b class="parameter">v_floatpoint:</b> (float, optional) Float value.</li>
+            <li><b class="parameter">v_string:</b> (string, optional) String value.</li>
+            <li><b class="parameter">v_jsonb:</b> (json, optional) JSONB value.</li>
+            <li><b class="parameter">v_boolean:</b> (bool, optional) Boolean value.</li>
+            <li><b class="parameter">v_timestamp:</b> (datetime, optional) Timestamp value.</li>
+        </ul>
+        <p><b class="important">Returns:</b> Confirmation message (201).</p>
+
+        <h3>2.2 GET /get_outcome_by_category_type/<int:id_run>/<int:id_category>/<int:id_type></h3>
+        <p><b class="important">Description:</b> Retrieves outcomes for a specific run ID and category/type.</p>
+        <p><b class="important">Parameters:</b></p>
+        <ul class="indent">
+            <li><b class="parameter">id_run:</b> (int, required) ID of the run.</li>
+            <li><b class="parameter">id_category:</b> (int, required) Category ID.</li>
+            <li><b class="parameter">id_type:</b> (int, required) Type ID.</li>
+        </ul>
+        <p><b class="important">Returns:</b> Array of outcomes (200) or error message (404).</p>
+
+        <h3>2.3 GET /getOutcome</h3>
+        <p><b class="important">Description:</b> Retrieves outcomes based on various filters.</p>
+        <p><b class="important">Parameters:</b></p>
+        <ul class="indent">
+            <li><b class="parameter">id_run:</b> (int, optional) ID of the run.</li>
+            <li><b class="parameter">id_category:</b> (int, optional) Category ID.</li>
+            <li><b class="parameter">id_type:</b> (int, optional) Type ID.</li>
+            <li><b class="parameter">v_integer:</b> (int, optional) Integer value.</li>
+            <li><b class="parameter">v_floatpoint:</b> (float, optional) Float value.</li>
+            <li><b class="parameter">v_string:</b> (string, optional) String value.</li>
+            <li><b class="parameter">v_jsonb:</b> (json, optional) JSONB value.</li>
+            <li><b class="parameter">v_boolean:</b> (bool, optional) Boolean value.</li>
+            <li><b class="parameter">v_timestamp:</b> (datetime, optional) Timestamp value.</li>
+            <li><b class="parameter">timestamp:</b> (datetime, optional) Timestamp value.</li>
+        </ul>
+        <p><b class="important">Returns:</b> Array of outcomes (200) or error message (404).</p>
+    </div>
+
+    <h2>Runs:</h2>
+    <div class="indent">
+        <h3>3.1 POST /create_new_run</h3>
+        <p><b class="important">Description:</b> Creates a new run entry.</p>
+        <p><b class="important">Parameters:</b></p>
+        <ul class="indent">
+            <li><b class="parameter">id_script:</b> (int, required) ID of the script.</li>
+            <li><b class="parameter">id_run_father:</b> (int, optional) ID of the father run.</li>
+        </ul>
+        <p><b class="important">Returns:</b> New run ID (201) or error message (500).</p>
+
+        <h3>3.2 GET /get_all_runs</h3>
+        <p><b class="important">Description:</b> Retrieves all run IDs, their script IDs, father run IDs, and their timestamps.</p>
+        <p><b class="important">Returns:</b> Array of runs (200) or error message (404).</p>
+
+        <h3>3.3 GET /get_father_runs</h3>
+        <p><b class="important">Description:</b> Retrieves all runs that are 'father' runs.</p>
+        <p><b class="important">Returns:</b> Array of father runs (200) or error message (404).</p>
+
+        <h3>3.4 GET /get_runid_childs/<int:father_runid></h3>
+        <p><b class="important">Description:</b> Retrieves all child run IDs for a given 'father' run ID.</p>
+        <p><b class="important">Parameters:</b></p>
+        <ul class="indent">
+            <li><b class="parameter">father_runid:</b> (int, required) ID of the father run.</li>
+        </ul>
+        <p><b class="important">Returns:</b> Array of child run IDs (200) or empty array (200).</p>
+    </div>
+
+    <h2>Data Run Types:</h2>
+    <div class="indent">
+        <h3>4.1 GET /get_data_run_types</h3>
+        <p><b class="important">Description:</b> Retrieves data run types based on filters.</p>
+        <p><b class="important">Parameters:</b></p>
+        <ul class="indent">
+            <li><b class="parameter">id_category:</b> (int, optional) Category ID.</li>
+            <li><b class="parameter">id_type:</b> (int, optional) Type ID.</li>
+            <li><b class="parameter">category_name:</b> (string, optional) Category name.</li>
+            <li><b class="parameter">type_name:</b> (string, optional) Type name.</li>
+        </ul>
+        <p><b class="important">Returns:</b> Array of data run types (200) or error message (404).</p>
+    </div>
+
+    <h2>Miscellaneous:</h2>
+    <div class="indent">
+        <h3>5.1 GET /</h3>
+        <p><b class="important">Description:</b> Simple route to check if the Flask app is running.</p>
+        <p><b class="important">Returns:</b> Confirmation message.</p>
+    
+        <h3>5.2 GET /test_db_connection</h3>
+        <p><b class="important">Description:</b> Test the database connection.</p>
+        <p><b class="important">Returns:</b> Confirmation message (200) or error message (500).</p>
+        <p><b class="important">Example:</b></p>
+        <pre><code>curl -X GET http://localhost:5435/test_db_connection</code></pre>
+    </div>
+
+    <h2>Environment:</h2>
+    <p><b class="important">Running on Docker (if applicable):</b> RUNNING_IN_DOCKER</p>
+    <p><b class="important">Database Name:</b> DB_NAME</p>
+    <p><b class="important">Database User:</b> DB_USER</p>
+    <p><b class="important">Database Password:</b> DB_PASSWORD</p>
+    <p><b class="important">Database Host:</b> DB_HOST</p>
+    <p><b class="important">Database Port:</b> DB_PORT</p>
+    <p><b class="important">Application Port:</b> PORT (default 5435, can be set via PORT environment variable)</p>
+
+    <h2>Version History:</h2>
+    <ul>
+        <li>v1.2: Added jsonb v_type in outcome_runs table.</li>
+        <li>v1.1: Added v_boolean v_timestamp and timestamp in outcome_runs table.</li>
+        <li>v1.0: Initial release.</li>
+    </ul>
+</body>
+
+</html>
