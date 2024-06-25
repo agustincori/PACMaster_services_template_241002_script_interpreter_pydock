@@ -5,6 +5,8 @@ Main Features:
 
 Routes:
 - GET /: Summary of routes.
+- GET /sum_and_save: Computes the sum of two numbers and saves the arguments and result.
+- POST /create_new_run: Creates a new run entry in the database.
 
 Dependencies:
 - Flask: Web framework for building the API.
@@ -17,12 +19,14 @@ Environment Variables:
 
 Examples:
   GET http://localhost:PORT/
+  GET http://localhost:PORT/sum_and_save?arg1=10&arg2=20&user_id=1&use_db=true
 
 Author: Agustín Corigliano
-Version: 1.0.1
-Date: 24/06/19
+Version: 1.0.0
+Date: 25/06/24
 
 Notes:
+- Updated to include user_id and father_service_id parameters in the run creation process.
 """
 
 # coding: utf-8
@@ -58,6 +62,8 @@ def sum_and_save_route():
     - arg1 (int or float): The first number.
     - arg2 (int or float): The second number.
     - FatherRunID (int, optional): The identifier of the parent run, if this action is part of a larger process. Defaults to None.
+    - father_service_id (int, optional): The identifier of the father service. Required if FatherRunID is provided.
+    - user_id (int): The identifier of the user. Required if use_db is True.
     - use_db (bool, optional): Whether to use database connection for logging and saving outcome data. Defaults to True.
 
     Returns:
@@ -65,17 +71,22 @@ def sum_and_save_route():
     """
     id_script = 1
     try:
+        # Extract and validate request arguments
         arg1 = request.args.get("arg1", type=float)
         arg2 = request.args.get("arg2", type=float)
         FatherRunID = request.args.get("FatherRunID", type=int, default=None)
+        father_service_id = request.args.get("father_service_id", type=int, default=None)
+        user_id = request.args.get("user_id", type=int)
         use_db = request.args.get("use_db", type=lambda v: v.lower() == 'true', default=True)
-        
+
+        # Check for required parameters
         if arg1 is None or arg2 is None:
             return jsonify({"error": "arg1 and arg2 are required parameters"}), 400
 
+        # Create new run ID if use_db is True
         new_run_id = None
         if use_db:
-            new_run_id_response = get_new_runid(id_script, FatherRunid=FatherRunID) if FatherRunID else get_new_runid(id_script)
+            new_run_id_response = get_new_runid(id_script, user_id, father_service_id, FatherRunid=FatherRunID)
 
             if 'error' in new_run_id_response:
                 error_message = new_run_id_response.get('error', 'Unknown error occurred while creating new run ID.')
@@ -85,16 +96,21 @@ def sum_and_save_route():
 
             new_run_id = new_run_id_response.get('id_run')
 
+        # Prepare input arguments and log/save if necessary
         input_arguments = {
             "arg1": arg1,
             "arg2": arg2,
             "FatherRunID": FatherRunID,
+            "father_service_id": father_service_id,
+            "user_id": user_id,
             "use_db": use_db
         }
 
         if use_db and new_run_id:
             save_outcome_data(new_run_id, 0, 0, v_jsonb=input_arguments)
             log_to_api(id_run=new_run_id, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db)
+
+        # Perform the summation and return the result
         result = SumAndSave(arg1, arg2, new_run_id, use_db)
         return jsonify(result), 200
     except Exception as e:
