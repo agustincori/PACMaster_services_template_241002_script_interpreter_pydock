@@ -6,7 +6,6 @@ Main Features:
 Routes:
 - GET /: Summary of routes.
 - GET /sum_and_save: Computes the sum of two numbers and saves the arguments and result.
-- POST /create_new_run: Creates a new run entry in the database.
 
 Dependencies:
 - Flask: Web framework for building the API.
@@ -61,9 +60,9 @@ def sum_and_save_route():
     Parameters:
     - arg1 (int or float): The first number.
     - arg2 (int or float): The second number.
-    - FatherRunID (int, optional): The identifier of the parent run, if this action is part of a larger process. Defaults to None.
-    - father_service_id (int, optional): The identifier of the father service. Required if FatherRunID is provided.
-    - user_id (int): The identifier of the user. Required if use_db is True.
+    - id_father_run (int, optional): The identifier of the parent run, if this action is part of a larger process. Defaults to None.
+    - id_father_service (int, optional): The identifier of the father service. Required if FatherRunID is provided.
+    - id_user (int): The identifier of the user. Required if use_db is True.
     - use_db (bool, optional): Whether to use database connection for logging and saving outcome data. Defaults to True.
 
     Returns:
@@ -74,9 +73,9 @@ def sum_and_save_route():
         # Extract and validate request arguments
         arg1 = request.args.get("arg1", type=float)
         arg2 = request.args.get("arg2", type=float)
-        FatherRunID = request.args.get("FatherRunID", type=int, default=None)
-        father_service_id = request.args.get("father_service_id", type=int, default=None)
-        user_id = request.args.get("user_id", type=int)
+        id_father_run = request.args.get("id_father_run", type=int, default=None)
+        id_father_service = request.args.get("id_father_service", type=int, default=None)
+        id_user = request.args.get("id_user", type=int)
         use_db = request.args.get("use_db", type=lambda v: v.lower() == 'true', default=True)
 
         # Check for required parameters
@@ -86,7 +85,7 @@ def sum_and_save_route():
         # Create new run ID if use_db is True
         new_run_id = None
         if use_db:
-            new_run_id_response = get_new_runid(id_script, user_id, father_service_id, FatherRunid=FatherRunID)
+            new_run_id_response = get_new_runid(id_script, id_user, id_father_service, id_father_run=id_father_run)
 
             if 'error' in new_run_id_response:
                 error_message = new_run_id_response.get('error', 'Unknown error occurred while creating new run ID.')
@@ -100,9 +99,9 @@ def sum_and_save_route():
         input_arguments = {
             "arg1": arg1,
             "arg2": arg2,
-            "FatherRunID": FatherRunID,
-            "father_service_id": father_service_id,
-            "user_id": user_id,
+            "id_father_run": id_father_run,
+            "id_father_service": id_father_service,
+            "id_user": id_user,
             "use_db": use_db
         }
 

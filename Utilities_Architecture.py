@@ -71,7 +71,7 @@ def log_to_api(id_run, log_message, debug=False, warning=False, error=False, use
     else:
         print(log_message_with_timestamp)
 
-def get_new_runid(idscript, id_user, father_service_id=None, id_category=None, FatherRunid=None):
+def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, id_father_run=None):
     """
     Generates a new run ID by sending a request to a specific endpoint with the script ID,
     user ID, optional parent run ID, and optional father service ID. It fetches the script's
@@ -81,11 +81,11 @@ def get_new_runid(idscript, id_user, father_service_id=None, id_category=None, F
     If successful, it returns the new run ID; otherwise, it logs the error and returns the error details.
 
     Args:
-        idscript (int): The unique identifier for the script whose run ID is being created.
+        id_script (int): The unique identifier for the script whose run ID is being created.
         id_user (int): The unique identifier for the user.
-        father_service_id (int, optional): The identifier of the father service. Required if FatherRunid is provided.
+        id_father_service (int, optional): The identifier of the father service. Required if id_father_run is provided.
         id_category (int, optional): The category ID of the script. If not provided, a default value is used.
-        FatherRunid (str, optional): The run ID of the parent operation, if applicable.
+        id_father_run (str, optional): The run ID of the parent operation, if applicable.
 
     Returns:
         dict: The new run ID if the creation was successful; otherwise, a dictionary with error details.
@@ -97,16 +97,16 @@ def get_new_runid(idscript, id_user, father_service_id=None, id_category=None, F
     if id_user is None:
         raise ValueError("id_user is required and cannot be None")
 
-    if FatherRunid is not None and father_service_id is None:
-        raise ValueError("father_service_id is required if FatherRunid is provided")
+    if (id_father_run is not None and id_father_service is None) or (id_father_run is None and id_father_service is not None):
+        raise ValueError("id_father_service and id_father_run must either both be provided or both be None")
 
     # Ensure get_data_type returns a dictionary or handle it appropriately here
-    data_type = get_data_type(id_category if id_category is not None else 0, idscript)
+    data_type = get_data_type(id_category if id_category is not None else 0, id_script)
     
     if 'error' in data_type:
         error_message = data_type.get('error', 'Unknown error occurred while fetching data type.')
         details = data_type.get('details', 'No additional details provided.')
-        log_to_api(idscript, f"Error fetching data type: {error_message} - Details: {details}", debug=True, error=True)
+        log_to_api(id_script, f"Error fetching data type: {error_message} - Details: {details}", debug=True, error=True)
         return data_type
 
     if isinstance(data_type, list) and len(data_type) > 0:
@@ -116,10 +116,10 @@ def get_new_runid(idscript, id_user, father_service_id=None, id_category=None, F
 
     # Prepare the payload for the POST request
     payload = {
-        'id_script': idscript,
+        'id_script': id_script,
         'id_user': id_user,
-        'father_service_id': father_service_id,
-        'id_run_father': FatherRunid
+        'father_service_id': id_father_service,
+        'id_run_father': id_father_run
     }
 
     try:
@@ -132,12 +132,12 @@ def get_new_runid(idscript, id_user, father_service_id=None, id_category=None, F
 
             # Log the running script name and creation of a new run ID
             log_to_api(new_run_id, f'Running {script_name}', debug=True)
-            log_to_api(new_run_id, f"New run ID created: {new_run_id} for script ID: {idscript}", debug=True)
+            log_to_api(new_run_id, f"New run ID created: {new_run_id} for script ID: {id_script}", debug=True)
 
             return {'id_run': new_run_id}
         else:
             error_response = new_run_response.json()
-            log_to_api(idscript, f"Error creating new run: {error_response.get('message', 'Unknown error')}", debug=True, error=True)
+            log_to_api(id_script, f"Error creating new run: {error_response.get('message', 'Unknown error')}", debug=True, error=True)
             return error_response
     except requests.RequestException as e:
         # Log any exceptions that occur during the request
@@ -146,7 +146,7 @@ def get_new_runid(idscript, id_user, father_service_id=None, id_category=None, F
             'error': 'RequestException occurred',
             'message': str(e)
         }
-        log_to_api(idscript, f"RequestException: {str(e)}", debug=True, error=True)
+        log_to_api(id_script, f"RequestException: {str(e)}", debug=True, error=True)
         return error_response
 
 

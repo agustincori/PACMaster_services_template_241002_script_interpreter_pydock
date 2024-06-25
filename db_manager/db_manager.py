@@ -386,7 +386,7 @@ def create_new_run_new_architecture():
     # Extract parameters from the request
     id_script = request.json.get('id_script')
     id_user = request.json.get('id_user')
-    father_service_id = request.json.get('father_service_id', None)
+    id_father_service = request.json.get('father_service_id', None)
     id_run_father = request.json.get('id_run_father', None)
 
     # Ensure that mandatory parameters are present
@@ -397,9 +397,9 @@ def create_new_run_new_architecture():
         logging.error('id_user is a mandatory parameter.')
         return jsonify({'message': 'id_user is a mandatory parameter.'}), 400
 
-    if id_run_father is not None and father_service_id is None:
-        logging.error('father_service_id is required if id_run_father is provided.')
-        return jsonify({'message': 'father_service_id is required if id_run_father is provided.'}), 400
+    if (id_run_father is not None and id_father_service is None) or (id_run_father is None and id_father_service is not None):
+        logging.error("father_service_id and FatherRunid must either both be provided or both be None")
+        return jsonify({'message': "father_service_id and FatherRunid must either both be provided or both be None"}), 400
 
     conn_response = get_db_connection() # Attempt to get a database connection
     if isinstance(conn_response, tuple): # Check if a tuple was returned, indicating an error
@@ -414,9 +414,9 @@ def create_new_run_new_architecture():
         # Insert the new run into the runs table without specifying id_run
         logging.debug('Inserting the new run into the runs table.')
         cur.execute(f"""
-            INSERT INTO "runs_table" (id_script, id_user, id_run_father, father_service_id, timestamp) 
+            INSERT INTO "runs_table" (id_script, id_user, id_run_father, id_father_service, timestamp) 
             VALUES (%s, %s, %s, %s, %s) RETURNING id_run
-        """, (id_script, id_user, father_service_id, id_run_father, current_timestamp))
+        """, (id_script, id_user, id_father_service, id_run_father, current_timestamp))
         result = cur.fetchone()
         if result:
             new_id_run = result['id_run']  # Access by column name
