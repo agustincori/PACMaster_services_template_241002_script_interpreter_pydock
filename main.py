@@ -21,7 +21,7 @@ Examples:
   GET http://localhost:PORT/sum_and_save?arg1=10&arg2=20&user_id=1&use_db=true
 
 Author: Agustín Corigliano
-Version: 1.0.0
+Version: 1.0.1
 Date: 25/06/24
 
 Notes:
@@ -62,7 +62,8 @@ def sum_and_save_route():
     - arg2 (int or float): The second number.
     - id_father_run (int, optional): The identifier of the parent run, if this action is part of a larger process. Defaults to None.
     - id_father_service (int, optional): The identifier of the father service. Required if FatherRunID is provided.
-    - id_user (int): The identifier of the user. Required if use_db is True.
+    - user (str): The username for identification.
+    - pswrd (str): The password for identification.
     - use_db (bool, optional): Whether to use database connection for logging and saving outcome data. Defaults to True.
 
     Returns:
@@ -75,12 +76,21 @@ def sum_and_save_route():
         arg2 = request.args.get("arg2", type=float)
         id_father_run = request.args.get("id_father_run", type=int, default=None)
         id_father_service = request.args.get("id_father_service", type=int, default=None)
-        id_user = request.args.get("id_user", type=int)
+        user = request.args.get("user")
+        pswrd = request.args.get("pswrd")
         use_db = request.args.get("use_db", type=lambda v: v.lower() == 'true', default=True)
 
         # Check for required parameters
         if arg1 is None or arg2 is None:
             return jsonify({"error": "arg1 and arg2 are required parameters"}), 400
+
+        # Call user_identify to get id_user (placeholder for now)
+        id_user_response = user_identify(user, pswrd)
+
+        if id_user_response == 0:
+            id_user = 0  # Placeholder for now
+        else:
+            return jsonify({"error": "Invalid credentials"}), 401
 
         # Create new run ID if use_db is True
         new_run_id = None
@@ -101,7 +111,7 @@ def sum_and_save_route():
             "arg2": arg2,
             "id_father_run": id_father_run,
             "id_father_service": id_father_service,
-            "id_user": id_user,
+            "user": user,
             "use_db": use_db
         }
 
@@ -114,6 +124,18 @@ def sum_and_save_route():
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+def user_identify(user, pswrd):
+    """
+    Placeholder method to identify the user based on username and password.
+
+    Returns:
+    - int: User ID (placeholder value, currently returns 0).
+    """
+    # Placeholder authentication logic (return 0 for any credentials)
+    return 0
+
 
 
 @app.route("/")
