@@ -134,6 +134,7 @@ def sum_and_save_route():
         log_to_api(id_run=new_run_id, log_message="", debug=False, warning=False, error=False, use_db=use_db)
         return jsonify(result), 200
     except Exception as e:
+        log_to_api(id_run=new_run_id, log_message=f"Exception occurred: {str(e)}", debug=False, warning=False, error=True, use_db=use_db)
         return jsonify({"error": str(e)}), 500
 
 
