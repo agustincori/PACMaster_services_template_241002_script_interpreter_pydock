@@ -29,6 +29,7 @@ Notes:
 """
 
 # coding: utf-8
+import time
 import requests
 import json
 import os
@@ -70,6 +71,7 @@ def sum_and_save_route():
     - JSON response containing the arguments and the result of the summation.
     """
     id_script = 1
+    start_time = time.time()  # Record start time
     try:
         # Extract and validate request arguments
         arg1 = request.args.get("arg1", type=float)
@@ -79,7 +81,6 @@ def sum_and_save_route():
         user = request.args.get("user")
         pswrd = request.args.get("pswrd")
         use_db = request.args.get("use_db", type=lambda v: v.lower() == 'true', default=True)
-
         # Check for required parameters
         if arg1 is None or arg2 is None:
             return jsonify({"error": "arg1 and arg2 are required parameters"}), 400
@@ -114,13 +115,23 @@ def sum_and_save_route():
             "user": user,
             "use_db": use_db
         }
-
+        log_to_api(id_run=new_run_id, log_message="sum_and_save starts.-", debug=False, warning=False, error=False, use_db=use_db)
         if use_db and new_run_id:
             save_outcome_data(new_run_id, 0, 0, v_jsonb=input_arguments)
             log_to_api(id_run=new_run_id, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db)
 
         # Perform the summation and return the result
         result = SumAndSave(arg1, arg2, new_run_id, use_db)
+
+        end_time = time.time()  # Record end time
+        execution_time_ms = int((end_time - start_time) * 1000)  # Calculate execution time in milliseconds and convert to integer
+        result["execution_time_ms"] = execution_time_ms  # Add execution time in milliseconds to the result
+        if use_db and new_run_id:
+            save_outcome_data(new_run_id, 0, 1, v_integer=execution_time_ms)
+        log_to_api(id_run=new_run_id, log_message=f"execution_time_ms={execution_time_ms}", debug=False, warning=False, error=False, use_db=use_db)
+
+        log_to_api(id_run=new_run_id, log_message="sum_and_save ends.-", debug=False, warning=False, error=False, use_db=use_db)
+        log_to_api(id_run=new_run_id, log_message="", debug=False, warning=False, error=False, use_db=use_db)
         return jsonify(result), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
