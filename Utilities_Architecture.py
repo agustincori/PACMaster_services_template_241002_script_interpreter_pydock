@@ -105,8 +105,13 @@ def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, 
     
     if 'error' in data_type:
         error_message = data_type.get('error', 'Unknown error occurred while fetching data type.')
-        details = data_type.get('message', 'No additional details provided.')
-        log_to_api(id_script, f"Error fetching data type: {error_message} - Details: {details}", debug=True, error=True)
+        details = data_type.get('message') or data_type.get('details') or 'No additional details provided.'
+        # Check if the error message indicates a connection issue
+        connection_error_keywords = ["Max retries", "Failed to establish a new connection", "No connection could be made"]
+        use_db = True  # Default value for use_db
+        if any(keyword in details for keyword in connection_error_keywords):
+            use_db = False
+        log_to_api(id_script, f"Error fetching data type: {error_message} - Details: {details}", debug=True, error=True, use_db=use_db)
         return data_type
 
     if isinstance(data_type, list) and len(data_type) > 0:

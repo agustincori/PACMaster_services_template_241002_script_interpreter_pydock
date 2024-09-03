@@ -1,5 +1,7 @@
-# processing.py
+# Utilities_Main.py
 import logging
+import requests
+import os
 from Utilities_Architecture import log_to_api, get_new_runid, save_outcome_data
 
 def SumAndSave(arg1, arg2, run_id=None, use_db=False):
@@ -38,3 +40,32 @@ def SumAndSave(arg1, arg2, run_id=None, use_db=False):
             'error': 'SummationError',
             'message': error_message
         }
+    
+def user_identify(user, pswrd):
+    """
+    Method to identify the user based on username and password by calling the user validation API.
+
+    Returns:
+    - int: User ID if valid, or 0 if invalid.
+    """
+    user_manager_host = os.getenv('user_manager_host','localhost')
+    user_manager_port = os.getenv('user_manager_port',10070)
+    url = f"http://{user_manager_host}:{user_manager_port}/user_validation"
+
+    payload = {
+        "user": user,
+        "pswrd": pswrd
+    }
+
+    try:
+        response = requests.post(url, json=payload)
+        if response.status_code == 200:
+            # Assuming the API returns a JSON response with a "user_id" field
+            result = response.json()
+            return result.get('id_user', None)
+        else:
+            return None
+    except requests.exceptions.RequestException as e:
+        # Log the exception or handle it as necessary
+        print(f"Request failed: {e}")
+        return None
