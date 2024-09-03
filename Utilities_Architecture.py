@@ -105,7 +105,7 @@ def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, 
     
     if 'error' in data_type:
         error_message = data_type.get('error', 'Unknown error occurred while fetching data type.')
-        details = data_type.get('details', 'No additional details provided.')
+        details = data_type.get('message', 'No additional details provided.')
         log_to_api(id_script, f"Error fetching data type: {error_message} - Details: {details}", debug=True, error=True)
         return data_type
 

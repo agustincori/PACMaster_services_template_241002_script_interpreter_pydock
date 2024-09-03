@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  main_app:
+    build: .
+    container_name: 240813_service_sum_pydock_main_app
+    ports:
+      - "10081:10081"
+    volumes:
+      - .:/app
+    depends_on:
+      - db_manager
+    networks:
+      - services_network
+    environment:
+      - db_manager_HOST=db_manager
+      - db_manager_PORT=10082
+      - FLASK_DEBUG=false
+      - PORT=10081
+
+  db_manager:
+    build: ./db_manager
+    container_name: 240813_service_sum_pydock_db_manager
+    ports:
+      - "10082:10082"
+    volumes:
+      - ./db_manager:/app
+    networks:
+      - services_network
+    environment:
+      - RUNNING_IN_DOCKER=true
+      - DB_HOST=PACMasterDB
+      - DB_PORT=5432
+      - DB_NAME=postgres
+      - DB_USER=postgres
+      - DB_PASSWORD=xxx
+      - FLASK_DEBUG=false
+      - PORT=10082
+
+networks:
+  services_network:
+    external: true

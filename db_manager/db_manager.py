@@ -138,7 +138,7 @@ def insert_log():
         # Include the 'debug', 'warning', and 'error' columns in the INSERT statement
         cur.execute(
             """
-            INSERT INTO "logs_table" 
+            INSERT INTO "240813_service_sum_pydock_logs" 
             (id_run, log, debug, warning, error) 
             VALUES (%s, %s, %s, %s, %s)
             """,
@@ -178,7 +178,7 @@ def get_log_from_idrun(id_run):
         # Fetch logs for the given id_run and sort them by log_timestamp
         cur.execute("""
             SELECT log, debug, warning, error, log_timestamp 
-            FROM "logs_table" 
+            FROM "240813_service_sum_pydock_logs" 
             WHERE id_run = %s 
             ORDER BY log_timestamp ASC
             """, (id_run,))
@@ -261,7 +261,7 @@ def insert_outcome_run_new_arch():
     try:
         # Execute the INSERT command
         cur.execute("""
-            INSERT INTO "outcome_run_table"
+            INSERT INTO "240813_service_sum_pydock_outcome_run"
             (id_run, id_category, id_type, v_integer, v_floatpoint, v_string, v_jsonb, v_boolean, v_timestamp, timestamp) 
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, insert_data)
@@ -288,7 +288,7 @@ def get_outcome_by_category_type(id_run, id_category, id_type):
     try:
         # Fetch the outcomes for the given id_run, id_category, and id_type
         cur.execute("""
-            SELECT * FROM "outcome_run_table" 
+            SELECT * FROM "240813_service_sum_pydock_outcome_run" 
             WHERE id_run = %s AND id_category = %s AND id_type = %s
             """, (id_run, id_category, id_type))
         outcomes = cur.fetchall()
@@ -336,7 +336,7 @@ def getOutcome():
         - 404 HTTP status code if no outcomes are found.
     """
     # Retrieve arguments from the query string
-    query_parts = ["""SELECT * FROM "outcome_run_table" WHERE 1=1"""]
+    query_parts = ["""SELECT * FROM "240813_service_sum_pydock_outcome_run" WHERE 1=1"""]
     query_params = []
 
     # Dynamically build query based on provided parameters
@@ -414,7 +414,7 @@ def create_new_run_new_architecture():
         # Insert the new run into the runs table without specifying id_run
         logging.debug('Inserting the new run into the runs table.')
         cur.execute(f"""
-            INSERT INTO "runs_table" (id_script, id_user, id_run_father, id_father_service, timestamp) 
+            INSERT INTO "240813_service_sum_pydock_runs" (id_script, id_user, id_run_father, id_father_service, timestamp) 
             VALUES (%s, %s, %s, %s, %s) RETURNING id_run
         """, (id_script, id_user, id_father_service, id_run_father, current_timestamp))
         result = cur.fetchone()
@@ -454,7 +454,7 @@ def get_all_runs():
         cur = conn.cursor()
 
         # Fetch all run information and order by timestamp in descending order
-        cur.execute("""SELECT id_run, id_script, id_run_father, timestamp FROM "runs_table" ORDER BY timestamp DESC""")
+        cur.execute("""SELECT id_run, id_script, id_run_father, timestamp FROM "240813_service_sum_pydock_runs" ORDER BY timestamp DESC""")
         runs = cur.fetchall()
 
         # Close the database connection
@@ -498,7 +498,7 @@ def get_father_runs():
     # Query to fetch runs that do not have a child (id_run_father is NULL)
     query = """
     SELECT id_run, timestamp
-    FROM "runs_table"
+    FROM "240813_service_sum_pydock_runs"
     WHERE id_run_father IS NULL
     ORDER BY id_run DESC
     """
@@ -531,7 +531,7 @@ def get_runid_childs(father_runid):
         # Fetch all child run IDs that have the given father_runid
         cur.execute("""
             SELECT id_run
-            FROM "runs_table"
+            FROM "240813_service_sum_pydock_runs"
             WHERE id_run_father = %s
             ORDER BY id_run DESC
             """, (father_runid,))
@@ -571,7 +571,7 @@ def get_data_run_types():
     type_name = request.args.get('type_name', default=None, type=str)
 
     # Build the base query
-    query = """SELECT * FROM "data_run_types_table" WHERE 1=1"""
+    query = """SELECT * FROM "240813_service_sum_pydock_data_run_types" WHERE 1=1"""
     query_params = []
 
     # Dynamically append conditions to the query based on provided arguments
