@@ -39,7 +39,7 @@ from flask import (
     jsonify,
     render_template,
 )
-from Utilities_Main import SumAndSave,user_identify
+from Utilities_Main import SumAndSave,extract_and_validate_metadata
 from Utilities_Architecture import log_to_api, get_new_runid, save_outcome_data
 logging.basicConfig(
     level=logging.DEBUG
@@ -124,49 +124,7 @@ def sum_and_save_route():
         log_to_api(id_run=None, log_message=f"Exception occurred: {str(e)}", debug=False, warning=False, error=True, use_db=use_db)
         return jsonify({"error": str(e)}), 500
 
-def extract_and_validate_metadata(data):
-    """
-    Extract and validate metadata from the request data.
 
-    Parameters:
-    - data (dict): The JSON payload from the request.
-
-    Returns:
-    - dict: A dictionary containing the extracted metadata and a potential new_run_id.
-    - dict: A dictionary containing error information if validation fails.
-    """
-    # Extract metadata
-    id_father_run = data.get("id_father_run", None)
-    id_father_service = data.get("id_father_service", None)
-    user = data.get("user", None)
-    pswrd = data.get("password", None)
-    use_db = data.get("use_db", True)
-
-    # Check user credentials
-    id_user = user_identify(user, pswrd)
-    if id_user is None:
-        return None, {"error": "Invalid credentials", "status": 401}
-
-    # Validate relationships between metadata (e.g., if id_father_run is provided, id_father_service should also be provided)
-    if id_father_run is not None and id_father_service is None:
-        return None, {"error": "id_father_service is required when id_father_run is provided", "status": 400}
-
-    # Create new run ID if use_db is True
-    new_run_id = None
-    if use_db:
-        new_run_id_response = get_new_runid(id_script=1, id_user=id_user, id_father_service=id_father_service, id_father_run=id_father_run)
-        if 'error' in new_run_id_response:
-            details = new_run_id_response.get('message') or new_run_id_response.get('details') or 'No additional details provided.'
-            return None, {"error": new_run_id_response.get('error'), "details": details, "status": 500}
-        new_run_id = new_run_id_response.get('id_run')
-
-    return {
-        "id_father_run": id_father_run,
-        "id_father_service": id_father_service,
-        "user": user,
-        "use_db": use_db,
-        "new_run_id": new_run_id
-    }, None
 
 
 

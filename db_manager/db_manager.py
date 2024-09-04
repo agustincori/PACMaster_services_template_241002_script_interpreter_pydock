@@ -63,11 +63,11 @@ db_host = os.environ.get('DB_HOST', 'localhost')
 
 # Database connection parameters
 DB_PARAMS = {
-    'dbname': os.getenv('DB_NAME','postgres'),
-    'user': os.getenv('DB_USER','postgres'),
-    'password': os.getenv('DB_PASSWORD','xxx'),
+    'dbname': os.getenv('DB_NAME','db_psql'),
+    'user': os.getenv('DB_USER','myuser'),
+    'password': os.getenv('DB_PASSWORD','myp4sSw0rd_'),
     'host': os.getenv('DB_HOST',db_host),
-    'port': os.getenv('DB_PORT', 5432)
+    'port': os.getenv('DB_PORT', 5433)
 }
 
 def get_db_connection():

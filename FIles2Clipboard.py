@@ -48,7 +48,8 @@ def Files2Clipboard(path, file_extension, subdirectories=False):
 
     if content_to_copy:
         pyperclip.copy(content_to_copy)
-        print("All contents copied to clipboard.")
+        line_count = content_to_copy.count('\n')
+        print(f"All contents copied to clipboard [{line_count} lines].")
     else:
         print("No text files found to copy to clipboard.")
 
