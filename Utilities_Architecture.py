@@ -35,6 +35,7 @@ import requests
 import os
 from datetime import datetime
 import logging
+from Utilities_error_handling import log_and_raise,APIError,HTTPError
 
 # Obtener host y puerto desde variables de entorno
 db_manager_HOST = os.getenv('db_manager_HOST', 'localhost')
@@ -49,7 +50,7 @@ def log_to_api(id_run, log_message, debug=False, warning=False, error=False, use
     # Prepend timestamp to the log message
     log_message_with_timestamp = f"{timestamp} {log_message}"
     
-    if not use_db: 
+    if not use_db or id_run==None: 
         print(log_message_with_timestamp)  # Print the log message with timestamp
         return
     
@@ -157,7 +158,7 @@ def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, 
 
 
     
-def get_data_type(id_category, id_type):
+def get_data_type(id_category, id_type, id_run=None):
     """
     Retrieves data types based on category and type IDs from a specified endpoint.
     
@@ -168,6 +169,7 @@ def get_data_type(id_category, id_type):
     Args:
         id_category (int): The ID of the category to filter the data types.
         id_type (int): The ID of the type to filter the data types.
+        id_run (int, optional): The ID of the associated run for logging purposes. Defaults to None.
     
     Returns:
         dict: The response from the server if the request was successful and the server responded with data.
@@ -177,34 +179,27 @@ def get_data_type(id_category, id_type):
     # Define the endpoint URL
     url = f'{BASE_URL}/get_data_run_types'
     
-    # Prepare the parameters as a dictionary
+    # Prepare the parameters as a dictionary (for a GET request, these are query parameters)
     params = {
         'id_category': id_category,
         'id_type': id_type,
     }
     
     try:
-        # Send a GET request with the parameters
-        response = requests.get(url, params=params)
-        
-        # Check if the response was successful
-        response.raise_for_status()
-        return response.json()
-    except requests.HTTPError as http_err:
-        # Attempt to parse the error response as JSON
-        try:
-            error_response = response.json()
-        except ValueError:
-            error_response = {'error': 'HTTP error occurred', 'details': str(http_err)}
-        logging.error(f'HTTP error occurred: {http_err}, Response: {error_response}')
-        return error_response
+        # Make a request using the centralized handle_api_request function
+        response = handle_api_request(url, payload=params, id_run=id_run, expected_status=200)
+        return response
+
+    except requests.Timeout as e:
+        log_and_raise(APIError, f"Timeout Error: {str(e)}", id_run=id_run, context=f"method: get_data_type, URL: {url}")
+    except requests.ConnectionError as e:
+        log_and_raise(ConnectionError, f"Connection Error: {str(e)}", id_run=id_run, context=f"method: get_data_type, URL: {url}")
+    except requests.HTTPError as e:
+        log_and_raise(HTTPError, f"HTTP Error [Status: {e.response.status_code}] | Response: {e.response.text}", id_run=id_run, context=f"method: get_data_type, URL: {url}")
     except requests.RequestException as e:
-        # Log any other exceptions that occur during the request
-        logging.error(f'RequestException: {str(e)}')
-        return {
-            'error': 'RequestException occurred',
-            'message': str(e)
-        }
+        log_and_raise(APIError, f"Request Error: {e.response.text} | {str(e)}", id_run=id_run, context=f"method: get_data_type, URL: {url}")
+    except Exception as e:
+        log_and_raise(APIError, f"Unexpected Error: {e.response.text if 'response' in locals() else 'No response'} | {str(e)}", id_run=id_run, context=f"method: get_data_type, URL: {url}")
     
 def save_outcome_data(new_run_id, id_category, id_type, v_integer=None, v_float=None, v_string=None, v_boolean=None, v_timestamp=None, v_jsonb=None):
     """
@@ -374,3 +369,48 @@ def get_projecttype(projectname=None, id_project=None):
         # Log any exceptions that occur during the request
         log_to_api(0, f"Exception occurred while fetching project types: {e}", debug=True, error=True)
         return None
+
+def handle_api_request(url, payload, id_run=None, expected_status=200):
+    """
+    Sends an API request with error handling and logging. 
+
+    This method sends a POST request to the provided URL with the given payload and logs any 
+    errors encountered during the request.
+
+    Args:
+        url (str): The URL of the API endpoint to which the request is sent.
+        payload (dict): The data to be sent in the POST request.
+        id_run (int, optional): The ID of the associated run for logging purposes. Defaults to None.
+        expected_status (int, optional): The expected HTTP status code for a successful response. Defaults to 200.
+
+    Returns:
+        dict: The parsed JSON response from the API if the request is successful.
+
+    Raises:
+        APIError: If the response status code is not the expected status or if a network error occurs.
+        requests.Timeout: If the request times out.
+        requests.ConnectionError: If there is a connection issue.
+        requests.RequestException: For any other request-related errors.
+    """
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()  # Raises HTTPError if status code >= 400
+
+        if response.status_code != expected_status:
+            error_message = f"API request to {url} failed with status {response.status_code}: {response.text}"
+            log_and_raise(APIError, error_message, id_run=id_run, use_db=True)
+
+        return response.json()
+
+    except requests.Timeout as e:
+        # Log and encapsulate the error with upstream service and URL context
+        log_and_raise(APIError, f"Timeout Error: {str(e)}", id_run=id_run, context=f"method: handle_api_request, URL: {url}")
+
+    except requests.ConnectionError as e:  # Log and encapsulate the error with upstream service and URL context
+        log_and_raise(ConnectionError, f"Connection Error: {str(e)}", id_run=id_run, context=f"method: handle_api_request, URL: {url}")
+    except requests.HTTPError as e:  # Log and encapsulate the error with upstream service and URL context
+        log_and_raise(HTTPError, f"HTTP Error [Status: {response.status_code}] | Response: {response.text}", id_run=id_run, context=f"method: handle_api_request, URL: {url}")
+    except requests.RequestException as e:  # Log and encapsulate the error with upstream service and URL context
+        log_and_raise(APIError, f"Request Error: {response.text} | {str(e)}", id_run=id_run, context=f"method: handle_api_request, URL: {url}")
+    except Exception as e:  # Log and encapsulate any unexpected error with upstream service and URL context
+        log_and_raise(APIError, f"Unexpected Error: {response.text if 'response' in locals() else 'No response'} | {str(e)}", id_run=id_run, context=f"handle_api_request: user_validation, URL: {url}")

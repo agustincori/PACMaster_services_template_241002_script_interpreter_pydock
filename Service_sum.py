@@ -5,7 +5,7 @@ Main Features:
 
 Routes:
 - GET /: Summary of routes.
-- GET /sum_and_save: Computes the sum of two numbers and saves the arguments and result.
+- POST /sum_and_save: Computes the sum of two numbers and saves the arguments and result.
 
 Dependencies:
 - Flask: Web framework for building the API.
@@ -17,8 +17,7 @@ Environment Variables:
 - PORT: Specifies the port on which the application will listen.
 
 Examples:
-  GET http://localhost:PORT/
-  GET http://localhost:PORT/sum_and_save?arg1=10&arg2=20&user_id=1&use_db=true
+  POST http://localhost:PORT/sum_and_save
 
 Author: Agustín Corigliano
 Version: 1.1.0
@@ -28,26 +27,18 @@ Notes:
 - Updated to include user_id and father_service_id parameters in the run creation process.
 """
 
-# coding: utf-8
 import time
 import os
 import logging
+from flask import Flask, request, jsonify, render_template
 from waitress import serve
-from flask import (
-    Flask,
-    request,
-    jsonify,
-    render_template,
-)
-from Utilities_Main import SumAndSave,extract_and_validate_metadata
-from Utilities_Architecture import log_to_api, get_new_runid, save_outcome_data
-logging.basicConfig(
-    level=logging.DEBUG
-)  # Configures logging to display all debug messages
+from Utilities_Main import SumAndSave, extract_and_validate_metadata
+from Utilities_Architecture import log_to_api, save_outcome_data
+from Utilities_error_handling import log_and_raise, format_error_response, ValidationError, HTTPError, APIError
+
+logging.basicConfig(level=logging.DEBUG)  # Configures logging to display all debug messages
 
 app = Flask(__name__)
-
-
 
 @app.route("/sum_and_save", methods=["POST"])
 def sum_and_save_route():
@@ -71,14 +62,9 @@ def sum_and_save_route():
     Returns:
     - JSON: A response containing the result of the summation and, if applicable, 
       metadata such as execution time. If an error occurs, an error message is returned.
-    - HTTP Status Codes:
-        - 200 OK: The operation was successful, and the result is returned.
-        - 400 Bad Request: Required parameters are missing or invalid.
-        - 401 Unauthorized: Invalid user credentials.
-        - 500 Internal Server Error: An unexpected error occurred during processing.
     """
     start_time = time.time()
-
+    new_run_id = None
     try:
         # Extract and validate request arguments from JSON payload
         data = request.json
@@ -87,7 +73,7 @@ def sum_and_save_route():
 
         # Check for required parameters
         if arg1 is None or arg2 is None:
-            return jsonify({"error": "arg1 and arg2 are required parameters"}), 400
+            log_and_raise(ValidationError, "arg1 and arg2 are required parameters", id_run=None)
 
         # Extract and validate metadata
         metadata, error_response = extract_and_validate_metadata(data)
@@ -120,31 +106,25 @@ def sum_and_save_route():
 
         return jsonify(result), 200
 
+    except ValidationError as e:
+        return jsonify(format_error_response("Service_sum", str(e), new_run_id)), 400  # 400 Bad Request
+    except APIError as e:
+        return jsonify(format_error_response("Service_sum", str(e), new_run_id)), 500  # 500 Internal Server Error
+    except ConnectionError as e:
+        return jsonify(format_error_response("Service_sum", str(e), new_run_id)), 503  # 503 Service Unavailable
+    except HTTPError as e:
+        return jsonify(format_error_response("Service_sum", str(e), new_run_id)), 502  # 502 Bad Gateway
     except Exception as e:
-        log_to_api(id_run=None, log_message=f"Exception occurred: {str(e)}", debug=False, warning=False, error=True, use_db=use_db)
-        return jsonify({"error": str(e)}), 500
-
-
-
+        return jsonify(format_error_response("Service_sum", f"Unexpected error: {str(e)}", new_run_id)), 500  # 500 Internal Server Error
 
 
 @app.route("/")
 def summary():
     """
     Main root route, gives a summary of all routes.
-
-    Parameters:
-
-    Raises:
-
-    Returns:
-    - A summary of all routes and their arguments.
     """
     return render_template("index.html")
 
-
 if __name__ == "__main__":
-    port = int(
-        os.environ.get("PORT", 10033)
-    )  # Use port from environment variable or default to 10032
+    port = int(os.environ.get("PORT", 10033))  # Use port from environment variable or default to 10033
     serve(app, host="0.0.0.0", port=port)
