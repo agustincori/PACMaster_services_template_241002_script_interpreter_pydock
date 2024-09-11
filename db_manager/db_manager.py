@@ -54,7 +54,6 @@ logging.basicConfig(level=logging.DEBUG)
 app = Flask(__name__)
 CORS(app)
 
-
 # Determine if running in a Docker container
 running_in_docker = os.environ.get('RUNNING_IN_DOCKER', 'false').lower() == 'true'
 
@@ -63,11 +62,11 @@ db_host = os.environ.get('DB_HOST', 'localhost')
 
 # Database connection parameters
 DB_PARAMS = {
-    'dbname': os.getenv('DB_NAME','db_psql'),
+    'dbname': os.getenv('DB_NAME','db_psql_template'),
     'user': os.getenv('DB_USER','myuser'),
     'password': os.getenv('DB_PASSWORD','myp4sSw0rd_'),
     'host': os.getenv('DB_HOST',db_host),
-    'port': os.getenv('DB_PORT', 5433)
+    'port': os.getenv('DB_PORT', 5434)
 }
 
 def get_db_connection():
@@ -629,7 +628,7 @@ version_history = {
 
 if __name__ == '__main__':
     # Set the port to 5431 or to the 'PORT' environment variable if it is set.
-    port = int(os.environ.get('PORT', 5435))
+    port = int(os.environ.get('PORT', 20082))
     # Enable debug mode if the 'FLASK_DEBUG' environment variable is set to 'true'.
     debug = os.environ.get('FLASK_DEBUG', 'false').lower() == 'true'
     # Run the Flask application on the host 'localhost' which binds to all available interfaces.

@@ -16,12 +16,6 @@ Functions:
     save_outcome_data(new_run_id, id_category, id_type, v_integer=None, v_float=None, v_string=None, v_boolean=None, v_timestamp=None, v_jsonb=None):
         Submits outcome data for a given run ID.
 
-    getMaxPort(RunID, ProjectType):
-        Retrieves the maximum port number assigned so far based on ProjectType.
-
-    getNewPort(RunID, ProjectType):
-        Calculates and saves a new port number based on the maximum port used for a ProjectType.
-
     get_projecttype(projectname=None, id_project=None):
         Fetches project type information based on project name or project ID.
 
@@ -35,11 +29,11 @@ import requests
 import os
 from datetime import datetime
 import logging
-from Utilities_error_handling import log_and_raise,APIError,HTTPError
+from Utilities_error_handling import log_and_raise,handle_exceptions,APIError,HTTPError
 
 # Obtener host y puerto desde variables de entorno
 db_manager_HOST = os.getenv('db_manager_HOST', 'localhost')
-db_manager_PORT = os.getenv('db_manager_PORT', '5435')
+db_manager_PORT = os.getenv('db_manager_PORT', '20082')
 BASE_URL = f'http://{db_manager_HOST}:{db_manager_PORT}'
 
 
@@ -187,19 +181,17 @@ def get_data_type(id_category, id_type, id_run=None):
     
     try:
         # Make a request using the centralized handle_api_request function
-        response = handle_api_request(url, payload=params, id_run=id_run, expected_status=200)
+        response = handle_exceptions(
+            lambda: handle_api_request(url, payload=params,method='GET', id_run=id_run),
+            context=f"get_data_type: {url}",
+            id_run=id_run
+        )
         return response
 
-    except requests.Timeout as e:
-        log_and_raise(APIError, f"Timeout Error: {str(e)}", id_run=id_run, context=f"method: get_data_type, URL: {url}")
-    except requests.ConnectionError as e:
-        log_and_raise(ConnectionError, f"Connection Error: {str(e)}", id_run=id_run, context=f"method: get_data_type, URL: {url}")
-    except requests.HTTPError as e:
-        log_and_raise(HTTPError, f"HTTP Error [Status: {e.response.status_code}] | Response: {e.response.text}", id_run=id_run, context=f"method: get_data_type, URL: {url}")
-    except requests.RequestException as e:
-        log_and_raise(APIError, f"Request Error: {e.response.text} | {str(e)}", id_run=id_run, context=f"method: get_data_type, URL: {url}")
     except Exception as e:
-        log_and_raise(APIError, f"Unexpected Error: {e.response.text if 'response' in locals() else 'No response'} | {str(e)}", id_run=id_run, context=f"method: get_data_type, URL: {url}")
+        # Log the exception before raising it further
+        log_to_api(id_run, f"Exception in get_data_type: {str(e)}", error=True)
+        raise
     
 def save_outcome_data(new_run_id, id_category, id_type, v_integer=None, v_float=None, v_string=None, v_boolean=None, v_timestamp=None, v_jsonb=None):
     """
@@ -249,89 +241,6 @@ def save_outcome_data(new_run_id, id_category, id_type, v_integer=None, v_float=
         print(f"Failed to save outcome. Response: {outcome_response.text}")  # Adjust this to appropriate logging
         return False
 
-        
-def getMaxPort(RunID, ProjectType):
-    # Define the base URL for the API requests
-    base_url = f'{BASE_URL}/getOutcome'
-    
-    # Initialize id_type based on ProjectType
-    id_type = None
-    if ProjectType == 2:
-        id_type = 1
-    elif ProjectType == 3:
-        id_type = 2
-    
-    # Validate the id_type and construct the request URL
-    if id_type is not None:
-        url = f"{base_url}?id_category=2&id_type={id_type}"
-    else:
-        log_to_api(RunID, f"Invalid ProjectType: {ProjectType}. Unable to get max port.", debug=True, error=True)
-        return None
-    
-    # Perform the API request to get outcomes
-    try:
-        response = requests.get(url)
-        
-        # Check for a successful response
-        if response.status_code == 200:
-            outcomes = response.json()
-            
-            # Calculate the maximum port number from the outcomes
-            max_port = max([outcome.get('v_integer', 0) for outcome in outcomes], default=0)
-            
-            # Optionally, log the fetched maximum port number
-            log_to_api(RunID, f"Maximum port {max_port} retrieved for ProjectType: {ProjectType}.", debug=True)
-            
-            # Return the next available port number by adding 1 to the maximum
-            return max_port + 1
-        else:
-            log_to_api(RunID, f"Failed to fetch outcomes for ProjectType: {ProjectType}. Response: {response.text}", debug=True, error=True)
-            return None
-    except Exception as e:
-        log_to_api(RunID, f"Exception occurred while fetching outcomes for ProjectType: {ProjectType}: {e}", debug=True, error=True)
-        return None
-    
-def getNewPort(RunID, ProjectType):
-    # Define the base URL for the API requests
-    base_url = f'{BASE_URL}/getOutcome'
-    
-    # Determine the id_type and URL based on ProjectType
-    if ProjectType == 2:
-        id_type = 1
-    elif ProjectType == 3:
-        id_type = 2
-
-    if id_type is not None:
-        url = f"{base_url}?id_category=2&id_type={id_type}"
-        # Further processing here, such as making the request and handling the response
-    else:
-        log_to_api(RunID, f"Invalid ProjectType: {ProjectType}. Unable to get new port.", debug=True, error=True)
-        return None
-    
-    # Request the outcome data from the API
-    response = requests.get(url)
-    
-    if response.status_code != 200:
-        log_to_api(RunID, f"Failed to fetch outcomes for ProjectType: {ProjectType}. Response: {response.text}", debug=True, error=True)
-        return None
-    
-    outcomes = response.json()
-    
-    # Find the maximum v_integer value and increment it to get the new port number
-    max_port = max([outcome.get('v_integer', 0) for outcome in outcomes], default=0) + 1
-    
-    # Save the new port number as an outcome
-    saved = save_outcome_data(RunID, 2, id_type, v_integer=max_port)
-    
-    if saved:
-        log_to_api(RunID, f"New port {max_port} calculated and saved for ProjectType: {ProjectType}.", debug=True)
-    else:
-        log_to_api(RunID, f"Failed to save the new port {max_port} for ProjectType: {ProjectType}.", debug=True, error=True)
-        return None
-    
-    return max_port
-
-
 def get_projecttype(projectname=None, id_project=None):
     """
     Fetches project type based on project name or project ID.
@@ -370,47 +279,42 @@ def get_projecttype(projectname=None, id_project=None):
         log_to_api(0, f"Exception occurred while fetching project types: {e}", debug=True, error=True)
         return None
 
-def handle_api_request(url, payload, id_run=None, expected_status=200):
+def handle_api_request(url, payload=None, method='POST', id_run=None):
     """
-    Sends an API request with error handling and logging. 
+    Sends an API request with error handling and logging.
 
-    This method sends a POST request to the provided URL with the given payload and logs any 
+    This method sends a request (GET or POST) to the provided URL with the given payload and logs any 
     errors encountered during the request.
 
     Args:
         url (str): The URL of the API endpoint to which the request is sent.
-        payload (dict): The data to be sent in the POST request.
+        payload (dict, optional): The data to be sent in the request body (for POST) or as query parameters (for GET). Defaults to None.
+        method (str): The HTTP method to use for the request ('POST' or 'GET'). Defaults to 'POST'.
         id_run (int, optional): The ID of the associated run for logging purposes. Defaults to None.
-        expected_status (int, optional): The expected HTTP status code for a successful response. Defaults to 200.
 
     Returns:
         dict: The parsed JSON response from the API if the request is successful.
 
     Raises:
-        APIError: If the response status code is not the expected status or if a network error occurs.
-        requests.Timeout: If the request times out.
-        requests.ConnectionError: If there is a connection issue.
-        requests.RequestException: For any other request-related errors.
+        APIError: If the response status code is not 200 or if a network error occurs.
     """
-    try:
-        response = requests.post(url, json=payload)
+
+    def request_func():
+        if method.upper() == 'POST':
+            response = requests.post(url, json=payload)
+        elif method.upper() == 'GET':
+            response = requests.get(url, params=payload)
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method}")
         response.raise_for_status()  # Raises HTTPError if status code >= 400
+        return response
 
-        if response.status_code != expected_status:
-            error_message = f"API request to {url} failed with status {response.status_code}: {response.text}"
-            log_and_raise(APIError, error_message, id_run=id_run, use_db=True)
-
+    try:
+        # Use handle_exceptions to manage error handling and logging
+        response = handle_exceptions(request_func, context=f"handle_api_request: {url}", id_run=id_run)
         return response.json()
-
-    except requests.Timeout as e:
-        # Log and encapsulate the error with upstream service and URL context
-        log_and_raise(APIError, f"Timeout Error: {str(e)}", id_run=id_run, context=f"method: handle_api_request, URL: {url}")
-
-    except requests.ConnectionError as e:  # Log and encapsulate the error with upstream service and URL context
-        log_and_raise(ConnectionError, f"Connection Error: {str(e)}", id_run=id_run, context=f"method: handle_api_request, URL: {url}")
-    except requests.HTTPError as e:  # Log and encapsulate the error with upstream service and URL context
-        log_and_raise(HTTPError, f"HTTP Error [Status: {response.status_code}] | Response: {response.text}", id_run=id_run, context=f"method: handle_api_request, URL: {url}")
-    except requests.RequestException as e:  # Log and encapsulate the error with upstream service and URL context
-        log_and_raise(APIError, f"Request Error: {response.text} | {str(e)}", id_run=id_run, context=f"method: handle_api_request, URL: {url}")
-    except Exception as e:  # Log and encapsulate any unexpected error with upstream service and URL context
-        log_and_raise(APIError, f"Unexpected Error: {response.text if 'response' in locals() else 'No response'} | {str(e)}", id_run=id_run, context=f"handle_api_request: user_validation, URL: {url}")
+    
+    except Exception as e:
+        # Log the exception using log_to_api before re-raising it
+        log_to_api(id_run, f"Exception in handle_api_request: {str(e)}", error=True)
+        raise  # Re-raise the exception to propagate it upstream

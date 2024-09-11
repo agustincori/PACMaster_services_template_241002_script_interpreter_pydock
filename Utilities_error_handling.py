@@ -1,7 +1,7 @@
 # Utilities_error_handling.py
 
 import logging
-from Utilities_Architecture import log_to_api
+import requests
 
 # Set up a centralized logger for cases where DB logging is not possible
 logger = logging.getLogger(__name__)
@@ -122,7 +122,7 @@ def log_and_raise(exception, error_message, id_run=None, context=None, debug=Fal
             error_message = f"{context} | {error_message}"
 
         # Attempt to log to API
-        log_to_api(id_run, error_message, debug=debug, warning=warning, error=error, use_db=use_db)
+        #log_to_api(id_run, error_message, debug=debug, warning=warning, error=error, use_db=use_db)
     except Exception as e:
         # Fallback to local logging if API logging fails
         logger.error(f"Failed to log to API: {e}")
@@ -143,7 +143,7 @@ def format_error_response(service_name, error_message, id_run=None):
         dict: A formatted JSON response.
     """
     # Log error to API
-    log_to_api(id_run, error_message, debug=False, warning=False, error=True, use_db=True)
+    #log_to_api(id_run, error_message, debug=False, warning=False, error=True, use_db=True)
 
     # Create a structured error response
     error_response = {
@@ -152,3 +152,50 @@ def format_error_response(service_name, error_message, id_run=None):
         "id_run": id_run
     }
     return error_response
+
+
+def handle_exceptions(func, context=None, id_run=None):
+    """
+    Generic error handling wrapper that catches various exceptions, logs them, and raises the appropriate custom exception.
+
+    Args:
+        func (callable): The function or callable to execute.
+        context (str, optional): Additional context to provide in the error message. Defaults to None.
+        id_run (int, optional): ID of the associated run for logging purposes. Defaults to None.
+
+    Returns:
+        The result of the function call if successful.
+
+    Raises:
+        CustomError: Depending on the type of exception encountered (APIError, ValidationError, DatabaseError, etc.).
+    """
+    try:
+        response = func()
+
+        # Check if the response status matches 200 (default expected status)
+        if hasattr(response, 'status_code') and response.status_code != 200:
+            error_message = f"Request failed with status {response.status_code}: {response.text}"
+            log_and_raise(APIError, error_message, context=context)
+
+        return response
+
+    except ValidationError as e:
+        log_and_raise(ValidationError, f"Validation Error: {str(e)}", context=context)
+    except DatabaseError as e:
+        log_and_raise(DatabaseError, f"Database Error: {str(e)}", context=context)
+    except requests.Timeout as e:
+        log_and_raise(APIError, f"Timeout Error: {str(e)}", context=context)
+    except requests.ConnectionError as e:
+        log_and_raise(ConnectionError, f"Connection Error: {str(e)}", context=context)
+    except requests.HTTPError as e:
+        log_and_raise(HTTPError, f"HTTP Error [Status: {e.response.status_code}] | Response: {e.response.text}", context=context)
+    except requests.RequestException as e:
+        log_and_raise(APIError, f"Request Error: {str(e)}", context=context)
+    except ConnectionError as e:
+        log_and_raise(ConnectionError, f"Connection Error: {str(e)}", context=context)
+    except HTTPError as e:
+        log_and_raise(HTTPError, f"HTTP Error [Status: {e.response.status_code}] | Response: {e.response.text}", context=context)
+    except CustomError as e:
+        log_and_raise(type(e), f"Custom Error: {str(e)}", context=context)
+    except Exception as e:
+        log_and_raise(APIError, f"Unexpected Error: {str(e)}", context=context)
