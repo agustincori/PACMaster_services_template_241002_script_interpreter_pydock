@@ -173,7 +173,7 @@ def handle_exceptions(func, context=None, id_run=None):
         response = func()
 
         # Check if the response status matches 200 (default expected status)
-        if hasattr(response, 'status_code') and response.status_code != 200:
+        if hasattr(response, 'status_code') and response.status_code not in [200, 201]:
             error_message = f"Request failed with status {response.status_code}: {response.text}"
             log_and_raise(APIError, error_message, context=context)
 

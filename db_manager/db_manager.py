@@ -378,59 +378,120 @@ def getOutcome():
 ##################################################
 ##################################################
 
-@app.route('/create_new_run', methods=['POST'])
-def create_new_run_new_architecture():
-    logging.debug('Starting create_new_run_new_architecture process.')
+# @app.route('/create_new_run', methods=['POST'])
+# def create_new_run_new_architecture():
+#     logging.debug('Starting create_new_run_new_architecture process.')
     
-    # Extract parameters from the request
-    id_script = request.json.get('id_script')
-    id_user = request.json.get('id_user')
-    id_father_service = request.json.get('father_service_id', None)
-    id_run_father = request.json.get('id_run_father', None)
+#     # Extract parameters from the request
+#     id_script = request.json.get('id_script')
+#     id_user = request.json.get('id_user')
+#     id_father_service = request.json.get('father_service_id', None)
+#     id_run_father = request.json.get('id_run_father', None)
+#     status = request.json.get('status', 0)  # Default to 'pending' if no status is provided
 
-    # Ensure that mandatory parameters are present
-    if id_script is None:
-        logging.error('id_script is a mandatory parameter.')
-        return jsonify({'message': 'id_script is a mandatory parameter.'}), 400
-    if id_user is None:
-        logging.error('id_user is a mandatory parameter.')
-        return jsonify({'message': 'id_user is a mandatory parameter.'}), 400
+#     # Ensure that mandatory parameters are present
+#     if id_script is None:
+#         logging.error('id_script is a mandatory parameter.')
+#         return jsonify({'message': 'id_script is a mandatory parameter.'}), 400
 
-    if (id_run_father is not None and id_father_service is None) or (id_run_father is None and id_father_service is not None):
-        logging.error("father_service_id and FatherRunid must either both be provided or both be None")
-        return jsonify({'message': "father_service_id and FatherRunid must either both be provided or both be None"}), 400
+#     if (id_run_father is not None and id_father_service is None) or (id_run_father is None and id_father_service is not None):
+#         logging.error("father_service_id and FatherRunid must either both be provided or both be None")
+#         return jsonify({'message': "father_service_id and FatherRunid must either both be provided or both be None"}), 400
 
-    conn_response = get_db_connection() # Attempt to get a database connection
-    if isinstance(conn_response, tuple): # Check if a tuple was returned, indicating an error
-        return conn_response  # Return the JSON error response and status code
-    conn = conn_response
-    cur = conn.cursor()
-    # Get the current timestamp
-    current_timestamp = datetime.now()
-    logging.debug(f'Current timestamp: {current_timestamp}')
+#     conn_response = get_db_connection()  # Attempt to get a database connection
+#     if isinstance(conn_response, tuple):  # Check if a tuple was returned, indicating an error
+#         return conn_response  # Return the JSON error response and status code
+#     conn = conn_response
+#     cur = conn.cursor()
+#     # Get the current timestamp
+#     current_timestamp = datetime.now()
+#     logging.debug(f'Current timestamp: {current_timestamp}')
 
-    try:
-        # Insert the new run into the runs table without specifying id_run
-        logging.debug('Inserting the new run into the runs table.')
-        cur.execute(f"""
-            INSERT INTO "240813_service_sum_pydock_runs" (id_script, id_user, id_run_father, id_father_service, timestamp) 
-            VALUES (%s, %s, %s, %s, %s) RETURNING id_run
-        """, (id_script, id_user, id_father_service, id_run_father, current_timestamp))
-        result = cur.fetchone()
-        if result:
-            new_id_run = result['id_run']  # Access by column name
-            conn.commit()
-            logging.debug(f'New run created successfully with id_run: {new_id_run}')
-            return jsonify({'id_run': new_id_run}), 201
-        else:
-            raise Exception('No row inserted.')
-    except Exception as e:
-        logging.error(f'Error creating new run: {e}')
-        conn.rollback()
-        return jsonify({'message': 'Error creating new run', 'error': str(e)}), 500
-    finally:
-        cur.close()
-        conn.close()
+#     try:
+#         # Insert the new run into the runs table, including the status field
+#         logging.debug('Inserting the new run into the runs table.')
+#         cur.execute(f"""
+#             INSERT INTO "240813_service_sum_pydock_runs" (id_script, id_user, id_run_father, id_father_service, timestamp, status) 
+#             VALUES (%s, %s, %s, %s, %s, %s) RETURNING id_run
+#         """, (id_script, id_user, id_run_father, id_father_service, current_timestamp, status))
+        
+#         result = cur.fetchone()
+#         if result:
+#             new_id_run = result['id_run']  # Access by column name
+#             conn.commit()
+#             logging.debug(f'New run created successfully with id_run: {new_id_run}')
+#             return jsonify({'id_run': new_id_run}), 201
+#         else:
+#             raise Exception('No row inserted.')
+#     except Exception as e:
+#         logging.error(f'Error creating new run: {e}')
+#         conn.rollback()
+#         return jsonify({'message': 'Error creating new run', 'error': str(e)}), 500
+#     finally:
+#         cur.close()
+#         conn.close()
+
+# @app.route('/update_run', methods=['PUT'])
+# def update_run():
+#     logging.debug('Starting update_run process.')
+
+#     # Extract parameters from the request
+#     id_run = request.json.get('id_run')  # This is mandatory
+#     id_user = request.json.get('id_user', None)  # Optional
+#     status = request.json.get('status', None)  # Optional
+
+#     # Ensure that id_run is provided
+#     if id_run is None:
+#         logging.error('id_run is a mandatory parameter.')
+#         return jsonify({'message': 'id_run is a mandatory parameter.'}), 400
+
+#     # Ensure that at least one of id_user or status is provided
+#     if id_user is None and status is None:
+#         logging.error('At least one of id_user or status must be provided.')
+#         return jsonify({'message': 'At least one of id_user or status must be provided.'}), 400
+
+#     conn_response = get_db_connection()  # Attempt to get a database connection
+#     if isinstance(conn_response, tuple):  # Check if a tuple was returned, indicating an error
+#         return conn_response  # Return the JSON error response and status code
+#     conn = conn_response
+#     cur = conn.cursor()
+
+#     # Build the SQL query dynamically based on which fields are provided
+#     update_fields = []
+#     update_values = []
+
+#     if id_user is not None:
+#         update_fields.append("id_user = %s")
+#         update_values.append(id_user)
+
+#     if status is not None:
+#         update_fields.append("status = %s")
+#         update_values.append(status)
+
+#     update_values.append(id_run)  # Add id_run to the list of parameters for WHERE clause
+
+#     # Create the SQL query dynamically based on the fields that need to be updated
+#     update_query = f"""
+#         UPDATE "240813_service_sum_pydock_runs"
+#         SET {', '.join(update_fields)}
+#         WHERE id_run = %s
+#     """
+
+#     try:
+#         logging.debug(f'Executing update query: {update_query}')
+#         cur.execute(update_query, update_values)
+#         conn.commit()
+#         logging.debug(f'Run with id_run: {id_run} updated successfully.')
+#         return jsonify({'message': f'Run with id_run: {id_run} updated successfully.'}), 200
+#     except Exception as e:
+#         logging.error(f'Error updating run: {e}')
+#         conn.rollback()
+#         return jsonify({'message': 'Error updating run', 'error': str(e)}), 500
+#     finally:
+#         cur.close()
+#         conn.close()
+
+
 
 @app.route('/get_all_runs', methods=['GET'])
 def get_all_runs():

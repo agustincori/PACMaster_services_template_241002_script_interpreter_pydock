@@ -33,8 +33,11 @@ from Utilities_error_handling import log_and_raise,handle_exceptions,APIError,HT
 
 # Obtener host y puerto desde variables de entorno
 db_manager_HOST = os.getenv('db_manager_HOST', 'localhost')
-db_manager_PORT = os.getenv('db_manager_PORT', '20082')
+db_manager_PORT = os.getenv('db_manager_PORT', '20083')
 BASE_URL = f'http://{db_manager_HOST}:{db_manager_PORT}'
+
+service_name ='240813_service_sum_pydock'
+
 
 
 def log_to_api(id_run, log_message, debug=False, warning=False, error=False, use_db=True):
@@ -66,11 +69,11 @@ def log_to_api(id_run, log_message, debug=False, warning=False, error=False, use
     else:
         print(log_message_with_timestamp)
 
-def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, id_father_run=None):
+def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, id_father_run=None,user=None,password=None):
     """
-    Generates a new run ID by sending a request to a specific endpoint with the script ID,
-    user ID, optional parent run ID, and optional father service ID. It fetches the script's
-    category and type by ID, logs the operation, and handles the creation of a new run ID.
+    Generates a new run ID by sending a request to the /create_new_run API endpoint with the script ID,
+    user ID, optional parent run ID, and optional father service ID. The method dynamically determines the table name
+    based on the provided service_name.
 
     The method logs both the operation's initiation and its outcome (success or failure).
     If successful, it returns the new run ID; otherwise, it logs the error and returns the error details.
@@ -88,68 +91,62 @@ def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, 
     Raises:
         ValueError: If required arguments are not provided.
     """
-    # Validate required arguments
-    if id_user is None:
-        raise ValueError("id_user is required and cannot be None")
 
-    if (id_father_run is not None and id_father_service is None) or (id_father_run is None and id_father_service is not None):
-        raise ValueError("id_father_service and id_father_run must either both be provided or both be None")
-
-    # Ensure get_data_type returns a dictionary or handle it appropriately here
-    data_type = get_data_type(id_category if id_category is not None else 0, id_script)
-    
-    if 'error' in data_type:
-        error_message = data_type.get('error', 'Unknown error occurred while fetching data type.')
-        details = data_type.get('message') or data_type.get('details') or 'No additional details provided.'
-        # Check if the error message indicates a connection issue
-        connection_error_keywords = ["Max retries", "Failed to establish a new connection", "No connection could be made"]
-        use_db = True  # Default value for use_db
-        if any(keyword in details for keyword in connection_error_keywords):
-            use_db = False
-        log_to_api(id_script, f"Error fetching data type: {error_message} - Details: {details}", debug=True, error=True, use_db=use_db)
-        return data_type
-
-    if isinstance(data_type, list) and len(data_type) > 0:
-        data_type = data_type[0]  # Assuming the first item is the relevant one
-
-    script_name = f"{data_type.get('category_name', 'Unknown')} - {data_type.get('type_name', 'Script')}" if data_type else 'Unknown Script'
-
-    # Prepare the payload for the POST request
     payload = {
+        'service_name': service_name,
         'id_script': id_script,
         'id_user': id_user,
         'father_service_id': id_father_service,
-        'id_run_father': id_father_run
+        'id_run_father': id_father_run,
+        'user': user,
+        'password': password                
     }
 
+    url = f"{BASE_URL}/create_new_run"
+
     try:
-        # Send a POST request to the new API endpoint
-        new_run_response = requests.post(f'{BASE_URL}/create_new_run', json=payload)
-        new_run_response.raise_for_status()  # Raise an error for bad status codes
+        # Use handle_api_request from Utilities_Architecture.py to send the API request
+        new_run_response = handle_api_request(url, payload=payload, method='POST')
 
-        if new_run_response.status_code == 201:
-            new_run_id = new_run_response.json().get('id_run')
-
-            # Log the running script name and creation of a new run ID
-            log_to_api(new_run_id, f'Running {script_name}', debug=True)
-            log_to_api(new_run_id, f"New run ID created: {new_run_id} for script ID: {id_script}", debug=True)
-
+        # Process the response
+        new_run_id = new_run_response.get('id_run')
+        if new_run_id:
+            log_to_api(new_run_id, f"New run ID created: {new_run_id} for script ID: {id_script} in service {service_name}", debug=True)
             return {'id_run': new_run_id}
         else:
-            error_response = new_run_response.json()
-            log_to_api(id_script, f"Error creating new run: {error_response.get('message', 'Unknown error')}", debug=True, error=True)
-            return error_response
-    except requests.RequestException as e:
-        # Log any exceptions that occur during the request
-        logging.error(f'RequestException: {str(e)}')
-        error_response = {
-            'error': 'RequestException occurred',
-            'message': str(e)
-        }
-        log_to_api(id_script, f"RequestException: {str(e)}", debug=True, error=True)
-        return error_response
+            log_and_raise(APIError, "Run ID not found in the response", id_run=None, context="get_new_runid")
+        
+    except Exception as e:
+        log_and_raise(APIError, f"Error in get_new_runid: {str(e)}", id_run=None, context="get_new_runid")
 
+def update_run_fields(id_run, id_user=None, status=None):
+    """
+    Function to update the run with the given id_user and/or status.
+    
+    Args:
+        id_run (int): The ID of the run to update.
+        id_user (int, optional): The user ID to update. Defaults to None.
+        status (int, optional): The status to update. Defaults to None.
 
+    Returns:
+        tuple: (response_json, status_code)
+    """
+    # Build the payload for updating the run
+    update_data = {
+        "id_run": id_run
+    }
+
+    if id_user is not None:
+        update_data['id_user'] = id_user
+
+    if status is not None:
+        update_data['status'] = status
+
+    # Make an API call to the update endpoint (or use a DB function if available)
+    response = requests.put(f'{BASE_URL}/update_run', json=update_data)
+
+    # Return the response in a tuple (response JSON and status code)
+    return response.json(), response.status_code
 
     
 def get_data_type(id_category, id_type, id_run=None):
@@ -318,3 +315,37 @@ def handle_api_request(url, payload=None, method='POST', id_run=None):
         # Log the exception using log_to_api before re-raising it
         log_to_api(id_run, f"Exception in handle_api_request: {str(e)}", error=True)
         raise  # Re-raise the exception to propagate it upstream
+
+def update_run_status(id_run, user, password, status=None, id_user=None):
+    """
+    Updates the run with the given id_run by making a POST request to the /update_run_status endpoint.
+
+    Args:
+        id_run (int): The run ID to update.
+        service_name (str): The name of the service.
+        user (str): Username for authentication.
+        password (str): Password for authentication.
+        status (int, optional): The new status value to set.
+        id_user (int, optional): The new id_user value to set.
+
+    Returns:
+        dict: The response from the API.
+
+    Raises:
+        Exception: If the API call fails.
+    """
+    payload = {
+        'id_run': id_run,
+        'service_name': service_name,
+        'user': user,
+        'password': password,
+    }
+    if status is not None:
+        payload['status'] = status
+    if id_user is not None:
+        payload['id_user'] = id_user
+
+    url = f"{BASE_URL}/update_run_status"
+
+    response = handle_api_request(url, payload=payload)
+    return response

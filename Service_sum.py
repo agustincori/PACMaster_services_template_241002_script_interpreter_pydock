@@ -64,10 +64,12 @@ def sum_and_save_route():
       metadata such as execution time. If an error occurs, an error message is returned.
     """
     start_time = time.time()
-    new_run_id = None
+    id_run = None
+    id_script=0
     try:
         # Extract and validate request arguments from JSON payload
         data = request.json
+        data["id_script"] = id_script        
         arg1 = data.get("arg1")
         arg2 = data.get("arg2")
 
@@ -80,42 +82,42 @@ def sum_and_save_route():
         if error_response:
             return jsonify(error_response), error_response["status"]
 
-        new_run_id = metadata["new_run_id"]
+        id_run = metadata["new_run_id"]
         use_db = metadata["use_db"]
 
         # Log and save input arguments if necessary
         input_arguments = {"arg1": arg1, "arg2": arg2, **metadata}
-        log_to_api(id_run=new_run_id, log_message="sum_and_save starts.-", debug=False, warning=False, error=False, use_db=use_db)
+        log_to_api(id_run=id_run, log_message="sum_and_save starts.-", debug=False, warning=False, error=False, use_db=use_db)
         
-        if use_db and new_run_id:
-            save_outcome_data(new_run_id, 0, 0, v_jsonb=input_arguments)
-            log_to_api(id_run=new_run_id, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db)
+        if use_db and id_run:
+            save_outcome_data(id_run, 0, 0, v_jsonb=input_arguments)
+            log_to_api(id_run=id_run, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db)
 
         # Perform the summation and return the result
-        result = SumAndSave(arg1, arg2, new_run_id, use_db)
+        result = SumAndSave(arg1, arg2, id_run, use_db)
 
         # Calculate execution time
         execution_time_ms = int((time.time() - start_time) * 1000)
         result["execution_time_ms"] = execution_time_ms
 
-        if use_db and new_run_id:
-            save_outcome_data(new_run_id, 0, 1, v_integer=execution_time_ms)
+        if use_db and id_run:
+            save_outcome_data(id_run, 0, 1, v_integer=execution_time_ms)
 
-        log_to_api(id_run=new_run_id, log_message=f"execution_time_ms={execution_time_ms}", debug=False, warning=False, error=False, use_db=use_db)
-        log_to_api(id_run=new_run_id, log_message="sum_and_save ends.-", debug=False, warning=False, error=False, use_db=use_db)
+        log_to_api(id_run=id_run, log_message=f"execution_time_ms={execution_time_ms}", debug=False, warning=False, error=False, use_db=use_db)
+        log_to_api(id_run=id_run, log_message="sum_and_save ends.-", debug=False, warning=False, error=False, use_db=use_db)
 
         return jsonify(result), 200
 
     except ValidationError as e:
-        return jsonify(format_error_response("Service_sum", str(e), new_run_id)), 400  # 400 Bad Request
+        return jsonify(format_error_response("Service_sum", str(e), id_run)), 400  # 400 Bad Request
     except APIError as e:
-        return jsonify(format_error_response("Service_sum", str(e), new_run_id)), 500  # 500 Internal Server Error
+        return jsonify(format_error_response("Service_sum", str(e), id_run)), 500  # 500 Internal Server Error
     except ConnectionError as e:
-        return jsonify(format_error_response("Service_sum", str(e), new_run_id)), 503  # 503 Service Unavailable
+        return jsonify(format_error_response("Service_sum", str(e), id_run)), 503  # 503 Service Unavailable
     except HTTPError as e:
-        return jsonify(format_error_response("Service_sum", str(e), new_run_id)), 502  # 502 Bad Gateway
+        return jsonify(format_error_response("Service_sum", str(e), id_run)), 502  # 502 Bad Gateway
     except Exception as e:
-        return jsonify(format_error_response("Service_sum", f"Unexpected error: {str(e)}", new_run_id)), 500  # 500 Internal Server Error
+        return jsonify(format_error_response("Service_sum", f"Unexpected error: {str(e)}", id_run)), 500  # 500 Internal Server Error
 
 
 @app.route("/")

@@ -1,0 +1,34 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run Service_sum.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/Service_sum.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "Run db_manager.py",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/db_manager/db_manager.py",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Run Both (Service_sum.py and db_manager.py)",
+            "configurations": [
+                "Run Service_sum.py",
+                "Run db_manager.py"
+            ]
+        }
+    ]
+}
