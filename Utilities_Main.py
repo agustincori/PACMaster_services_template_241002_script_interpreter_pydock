@@ -1,48 +1,87 @@
 # Utilities_Main.py
-import logging
-import requests
-import os
+import yaml
 from Utilities_Architecture import log_to_api, get_new_runid, save_outcome_data,user_identify,update_run_status
 from Utilities_error_handling import log_and_raise, handle_exceptions, APIError,HTTPError,ValidationError
+from flask import request,abort
 
-
-def SumAndSave(arg1, arg2, run_id=None, use_db=False):
+def sum_and_save(args, metadata, use_db=True):
     """
     Computes the sum of two numbers and saves the arguments and the result.
 
     Parameters:
-    - arg1 (int or float): The first number.
-    - arg2 (int or float): The second number.
-    - run_id (int, optional): The run ID for logging and saving outcome data.
+    - args (dict): A dictionary containing the arguments. Should contain 'arg1' and 'arg2'.
+    - metadata (dict): A dictionary containing metadata, including 'id_run'.
     - use_db (bool): Whether to use database connection for logging and saving outcome data. Defaults to True.
 
     Returns:
-    - dict: A dictionary containing the arguments and the result of the summation, or error details if an error occurs.
+    - dict: A dictionary containing the arguments and the result of the summation.
+
+    Raises:
+    - ValidationError: If arg1 or arg2 are missing or not numbers.
+    - Exception: For any other exceptions during the summation.
     """
+
+    id_run = metadata.get('id_run')
+
     try:
-        result = arg1 + arg2
+        # Extract arguments
+        arg1 = args.get('arg1')
+        arg2 = args.get('arg2')
+
+        # Check if arg1 and arg2 are provided
+        if arg1 is None or arg2 is None:
+            log_and_raise(
+                ValidationError,
+                "arg1 and arg2 are required in args dictionary",
+                id_run=id_run,
+                context="sum_and_save"
+            )
+
+        # Attempt to convert arg1 and arg2 to numbers
+        try:
+            arg1 = float(arg1)
+            arg2 = float(arg2)
+        except ValueError as ve:
+            log_and_raise(
+                ValidationError,
+                f"arg1 and arg2 must be numbers. Error: {ve}",
+                id_run=id_run,
+                context="sum_and_save"
+            )
+
+        # Perform the summation
+        try:
+            result = arg1 + arg2
+        except Exception as e:
+            log_and_raise(
+                Exception,
+                f"An error occurred during summation: {e}",
+                id_run=id_run,
+                context="sum_and_save"
+            )
+
         outcome_data = {"arg1": arg1, "arg2": arg2, "sum": result}
 
-        if use_db and run_id is not None:
-            from Utilities_Architecture import log_to_api, save_outcome_data
-            log_to_api(id_run=run_id, log_message=f"Arguments: arg1 = {arg1}, arg2 = {arg2}, sum = {result}", debug=False, warning=False, error=False, use_db=use_db)
-            save_outcome_data(run_id, 1, 0, v_jsonb=outcome_data)
-            log_to_api(id_run=run_id, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db)
+        if use_db and id_run is not None:
+            log_to_api(metadata, log_message=f"Arguments: arg1 = {arg1}, arg2 = {arg2}, sum = {result}", use_db=use_db)
+            save_outcome_data(id_run, 1, 0, v_jsonb=outcome_data)
+            log_to_api(metadata, log_message="Outcome data saved successfully.", use_db=use_db)
         else:
             print("Outcome data:", outcome_data)
-        
+
         return outcome_data
-        
+
     except Exception as e:
-        error_message = f"An error occurred during summation: {e}"
-        if use_db and run_id is not None:
-            from Utilities_Architecture import log_to_api
-            log_to_api(id_run=run_id, log_message=error_message, debug=False, warning=False, error=True, use_db=use_db)
-        return {
-            'error': 'SummationError',
-            'message': error_message
-        }
-    
+        error_message = f"An unexpected error occurred: {e}"
+        if use_db and id_run is not None:
+            log_to_api(metadata, log_message=error_message, error=True, use_db=use_db)
+        # Log and raise the exception
+        log_and_raise(
+            Exception,
+            error_message,
+            id_run=id_run,
+            context="sum_and_save"
+        )
 
 def data_validation_metadata_generation(data):
     """
@@ -69,7 +108,16 @@ def data_validation_metadata_generation(data):
 
     def validate_user(metadata):
         user = metadata.get("user")
-        pswrd = metadata.get("password")
+        password = metadata.get("password")
+        if user is None or password is None:
+            log_and_raise(
+                ValidationError,
+                "User and password are required for authentication",
+                id_run=metadata.get("id_run"),
+                context="validate_user"
+            )
+
+        # Assume user_identify returns an id_user or None
         id_user = user_identify(metadata)
 
         if id_user is None:
@@ -86,15 +134,15 @@ def data_validation_metadata_generation(data):
     def create_new_run_id(metadata):
         if metadata["id_father_run"] is not None and metadata["id_father_service"] is None:
             log_and_raise(
-                ValueError,
+                ValidationError,
                 "id_father_service is required when id_father_run is provided",
                 id_run=metadata.get("id_run"),
                 context="create_new_run_id"
             )
-        
+
         if metadata["id_script"] is None:
             log_and_raise(
-                ValueError,
+                ValidationError,
                 "id_script is required and cannot be None",
                 id_run=metadata.get("id_run"),
                 context="create_new_run_id"
@@ -118,7 +166,7 @@ def data_validation_metadata_generation(data):
         # Create a new run ID if use_db is True
         if metadata["use_db"]:
             handle_exceptions(lambda: create_new_run_id(metadata), context="method: create_new_run_id")
-        
+
         # Validate user
         handle_exceptions(lambda: validate_user(metadata), context="method: validate_user_credentials")
 
@@ -127,6 +175,35 @@ def data_validation_metadata_generation(data):
 
     except Exception as e:
         # log_and_raise will handle logging and raising of exceptions
-        log_and_raise(Exception, str(e), id_run=metadata.get("id_run"), context="extract_and_validate_metadata")
+        log_and_raise(Exception, str(e), id_run=metadata.get("id_run"), context="data_validation_metadata_generation")
 
     
+def parse_request_data():
+    """
+    Parses the request data based on the Content-Type header.
+
+    Returns:
+    dict: The parsed data from the request.
+
+    Raises:
+    ValidationError: If the content type is unsupported or parsing fails.
+    """
+    if request.content_type in ['application/x-yaml', 'text/yaml']:
+        try:
+            data = yaml.safe_load(request.data)  # Parse the YAML payload
+            return data
+        except yaml.YAMLError as e:
+            log_and_raise(
+                ValidationError,
+                f"YAML parsing error: {str(e)}",
+                context="parse_request_data"
+            )
+    elif request.content_type == 'application/json':
+        data = request.get_json()  # Parse JSON payload
+        return data
+    else:
+        log_and_raise(
+            ValidationError,
+            "Unsupported content type. Use application/json or application/x-yaml.",
+            context="parse_request_data"
+        )

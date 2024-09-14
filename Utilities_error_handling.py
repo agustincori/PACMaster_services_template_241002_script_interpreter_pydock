@@ -101,13 +101,13 @@ class HTTPError(CustomError):
         super().__init__(f"{message} [Status Code: {status_code}]", details)
         self.status_code = status_code
 
-def log_and_raise(exception, error_message, id_run=None, context=None, debug=False, warning=False, error=True, use_db=True):
+def log_and_raise(exception_type, error_message, id_run=None, context=None, debug=False, warning=False, error=True, use_db=True):
     """
     Logs the provided error message to the API or falls back to local logging, then raises the provided exception.
     Automatically encapsulates the original error message with an additional context.
 
     Args:
-        exception (CustomError): The type of exception to raise.
+        exception_type (CustomError): The type of exception to raise.
         error_message (str): The error message to log and raise.
         id_run (int, optional): The ID of the associated run. Defaults to None.
         context (str, optional): The context of the service where the error occurred. Defaults to None.
@@ -122,36 +122,56 @@ def log_and_raise(exception, error_message, id_run=None, context=None, debug=Fal
             error_message = f"{context} | {error_message}"
 
         # Attempt to log to API
-        #log_to_api(id_run, error_message, debug=debug, warning=warning, error=error, use_db=use_db)
+        # log_to_api(id_run, error_message, debug=debug, warning=warning, error=error, use_db=use_db)
     except Exception as e:
         # Fallback to local logging if API logging fails
         logger.error(f"Failed to log to API: {e}")
         logger.error(error_message)
-    
-    raise exception(error_message)  
 
-def format_error_response(service_name, error_message, id_run=None):
+    # Raise the exception, preserving the original exception's details if possible
+    raise exception_type(error_message)
+
+
+def format_error_response(service_name, route_name, exception, id_run=None):
     """
-    Formats the JSON error response for easy reading, adding a service name tag.
-    
+    Formats the JSON error response and determines the HTTP status code based on the exception type.
+
     Args:
         service_name (str): The name of the service returning the error.
-        error_message (str): The full upstream error message.
-        id_run (dict): Additional run-related information.
+        route_name (str): The name of the route or method where the error occurred.
+        exception (Exception): The exception object caught.
+        id_run (int, optional): The run ID associated with the error.
 
     Returns:
-        dict: A formatted JSON response.
+        tuple: A tuple containing the formatted error response (dict) and the HTTP status code (int).
     """
-    # Log error to API
-    #log_to_api(id_run, error_message, debug=False, warning=False, error=True, use_db=True)
+    # Map exception types to HTTP status codes
+    exception_status_code_mapping = {
+        ValidationError: 400,  # Bad Request
+        APIError: 502,         # Bad Gateway
+        ConnectionError: 503,   # Service Unavailable
+        HTTPError: 500,        # Internal Server Error
+        Exception: 500         # Internal Server Error for any other exceptions
+    }
 
-    # Create a structured error response
+    # Get the status code based on the exception type
+    status_code = exception_status_code_mapping.get(type(exception), 500)
+
+    # Extract additional details if available
+    details = getattr(exception, 'details', None)
+    status_code = getattr(exception, 'status_code', status_code)
+
+    # Create the error response
     error_response = {
         "service": service_name,
-        "error": error_message,
-        "id_run": id_run
+        "route_name": route_name,
+        "error": str(exception),
+        "id_run": id_run,
+        "details": details
     }
-    return error_response
+
+    return error_response, status_code
+
 
 
 def handle_exceptions(func, context=None, id_run=None):
@@ -170,32 +190,19 @@ def handle_exceptions(func, context=None, id_run=None):
         CustomError: Depending on the type of exception encountered (APIError, ValidationError, DatabaseError, etc.).
     """
     try:
-        response = func()
+        return func()
 
-        # Check if the response status matches 200 (default expected status)
-        if hasattr(response, 'status_code') and response.status_code not in [200, 201]:
-            error_message = f"Request failed with status {response.status_code}: {response.text}"
-            log_and_raise(APIError, error_message, context=context)
-
-        return response
-
-    except ValidationError as e:
-        log_and_raise(ValidationError, f"Validation Error: {str(e)}", context=context)
-    except DatabaseError as e:
-        log_and_raise(DatabaseError, f"Database Error: {str(e)}", context=context)
-    except requests.Timeout as e:
-        log_and_raise(APIError, f"Timeout Error: {str(e)}", context=context)
-    except requests.ConnectionError as e:
-        log_and_raise(ConnectionError, f"Connection Error: {str(e)}", context=context)
-    except requests.HTTPError as e:
-        log_and_raise(HTTPError, f"HTTP Error [Status: {e.response.status_code}] | Response: {e.response.text}", context=context)
-    except requests.RequestException as e:
-        log_and_raise(APIError, f"Request Error: {str(e)}", context=context)
-    except ConnectionError as e:
-        log_and_raise(ConnectionError, f"Connection Error: {str(e)}", context=context)
+    except APIError as e:
+        log_and_raise(APIError, f"{context} | {str(e)}", id_run=id_run, context=context)
     except HTTPError as e:
-        log_and_raise(HTTPError, f"HTTP Error [Status: {e.response.status_code}] | Response: {e.response.text}", context=context)
+        log_and_raise(HTTPError, f"{context} | {str(e)}", id_run=id_run, context=context)
+    except requests.Timeout as e:
+        log_and_raise(APIError, f"{context} | Timeout Error: {str(e)}", id_run=id_run, context=context)
+    except requests.ConnectionError as e:
+        log_and_raise(ConnectionError, f"{context} | Connection Error: {str(e)}", id_run=id_run, context=context)
+    except requests.RequestException as e:
+        log_and_raise(APIError, f"{context} | Request Error: {str(e)}", id_run=id_run, context=context)
     except CustomError as e:
-        log_and_raise(type(e), f"Custom Error: {str(e)}", context=context)
+        log_and_raise(type(e), f"{context} | {str(e)}", id_run=id_run, context=context)
     except Exception as e:
-        log_and_raise(APIError, f"Unexpected Error: {str(e)}", context=context)
+        log_and_raise(APIError, f"{context} | Unexpected Error: {str(e)}", id_run=id_run, context=context)

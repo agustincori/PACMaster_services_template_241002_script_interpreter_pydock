@@ -100,8 +100,13 @@ db_manager_HOST = os.getenv('db_manager_HOST', 'localhost')
 db_manager_PORT = os.getenv('db_manager_PORT', '20083')
 BASE_URL = f'http://{db_manager_HOST}:{db_manager_PORT}'
 
-service_name ='240813_service_sum_pydock'
-
+# Get environment variables or set default values
+service_name = os.getenv('SERVICE_NAME', '240813_service_sum_pydock')
+id_service = int(os.getenv('ID_SERVICE', 1))
+service_data = {
+    'service_name': service_name,
+    'id_service': id_service
+}
 
 
 def log_to_api(metadata, log_message, debug=False, warning=False, error=False, use_db=True):
@@ -336,46 +341,6 @@ def save_outcome_data(new_run_id, id_category, id_type, v_integer=None, v_float=
         print(f"Failed to save outcome. Response: {outcome_response.text}")  # Adjust this to appropriate logging
         return False
 
-def handle_api_request(url, payload=None, method='POST', id_run=None):
-    """
-    Sends an API request with error handling and logging.
-
-    This method sends a request (GET or POST) to the provided URL with the given payload and logs any 
-    errors encountered during the request.
-
-    Args:
-        url (str): The URL of the API endpoint to which the request is sent.
-        payload (dict, optional): The data to be sent in the request body (for POST) or as query parameters (for GET). Defaults to None.
-        method (str): The HTTP method to use for the request ('POST' or 'GET'). Defaults to 'POST'.
-        id_run (int, optional): The ID of the associated run for logging purposes. Defaults to None.
-
-    Returns:
-        dict: The parsed JSON response from the API if the request is successful.
-
-    Raises:
-        APIError: If the response status code is not 200 or if a network error occurs.
-    """
-
-    def request_func():
-        if method.upper() == 'POST':
-            response = requests.post(url, json=payload)
-        elif method.upper() == 'GET':
-            response = requests.get(url, params=payload)
-        else:
-            raise ValueError(f"Unsupported HTTP method: {method}")
-        response.raise_for_status()  # Raises HTTPError if status code >= 400
-        return response
-
-    try:
-        # Use handle_exceptions to manage error handling and logging
-        response = handle_exceptions(request_func, context=f"handle_api_request: {url}", id_run=id_run)
-        return response.json()
-    
-    except Exception as e:
-        # Log the exception using log_to_api before re-raising it
-        log_to_api(id_run, f"Exception in handle_api_request: {str(e)}", error=True)
-        raise  # Re-raise the exception to propagate it upstream
-
 def update_run_status(metadata, status=None):
     """
     Updates the run with the given id_run by making a POST request to the /update_run_status endpoint.
@@ -453,10 +418,10 @@ def user_identify(metadata):
     # Call the user validation API
     try:
         result = handle_api_request(url, payload=payload, id_run=id_run)
-        user_id = result.get("id_user")
+        id_user = result.get("id_user")
 
         # Check if user_id exists
-        if user_id is None:
+        if id_user is None:
             log_and_raise(
                 ValidationError,
                 "User ID not found in the API response",
@@ -465,8 +430,8 @@ def user_identify(metadata):
             )
 
         # Update metadata with the user_id
-        metadata["id_user"] = user_id
-        log_to_api(metadata, f"User identified successfully: id_user={user_id}", debug=True, use_db=True)
+        metadata["id_user"] = id_user
+        log_to_api(metadata, f"User identified successfully: id_user={id_user}", debug=True, use_db=True)
 
         # If user validation is successful, update the run with the user_id and status
         update_response = update_run_status(metadata, status=1)
@@ -477,8 +442,69 @@ def user_identify(metadata):
                 APIError, error_message, id_run=id_run, context="user_identify"
             )
 
-        return user_id
+        return id_user
 
     except Exception as e:
         # Handle and raise exceptions
         log_and_raise(APIError, f"Error in user_identify: {str(e)}", id_run=id_run, context="user_identify")
+
+
+
+def handle_api_request(url, payload=None, method='POST', id_run=None):
+    """
+    Sends an API request with error handling and logging.
+
+    Args:
+        url (str): The URL of the API endpoint to which the request is sent.
+        payload (dict, optional): The data to be sent in the request body (for POST) or as query parameters (for GET). Defaults to None.
+        method (str): The HTTP method to use for the request ('POST' or 'GET'). Defaults to 'POST'.
+        id_run (int, optional): The ID of the associated run for logging purposes. Defaults to None.
+
+    Returns:
+        dict: The parsed JSON response from the API if the request is successful.
+
+    Raises:
+        APIError: If the response status code is not 200 or if a network error occurs.
+    """
+
+    def request_func():
+        if method.upper() == 'POST':
+            response = requests.post(url, json=payload)
+        elif method.upper() == 'GET':
+            response = requests.get(url, params=payload)
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
+        # If the response status code indicates an error, handle it
+        if response.status_code >= 400:
+            try:
+                # Attempt to parse the error response as JSON
+                error_info = response.json()
+            except ValueError:
+                # If parsing fails, use the response text
+                error_info = {'error': response.text}
+
+            # Extract error details
+            service_name = error_info.get('service')
+            route_name = error_info.get('method') or error_info.get('route_name')
+            error_message = error_info.get('error', 'Unknown error occurred')
+
+            # Raise an APIError with detailed information
+            raise APIError(
+                message=f"Error from service '{service_name}', route '{route_name}': {error_message}",
+                status_code=response.status_code,
+                details=error_info
+            )
+
+        response.raise_for_status()  # Raises HTTPError if status code >= 400
+        return response
+
+    try:
+        # Use handle_exceptions to manage error handling and logging
+        response = handle_exceptions(request_func, context=f"handle_api_request: {url}", id_run=id_run)
+        return response.json()
+
+    except Exception as e:
+        # Log the exception using log_to_api before re-raising it
+        log_to_api(id_run, f"Exception in handle_api_request: {str(e)}", error=True)
+        raise  # Re-raise the exception to propagate it upstream

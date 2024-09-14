@@ -32,8 +32,8 @@ import os
 import logging
 from flask import Flask, request, jsonify, render_template
 from waitress import serve
-from Utilities_Main import SumAndSave, data_validation_metadata_generation
-from Utilities_Architecture import log_to_api, save_outcome_data
+from Utilities_Main import SumAndSave, data_validation_metadata_generation,parse_request_data
+from Utilities_Architecture import log_to_api, save_outcome_data,service_data
 from Utilities_error_handling import log_and_raise, format_error_response, ValidationError, HTTPError, APIError
 
 logging.basicConfig(level=logging.DEBUG)  # Configures logging to display all debug messages
@@ -63,35 +63,51 @@ def sum_and_save_route():
     - JSON: A response containing the result of the summation and, if applicable, 
       metadata such as execution time. If an error occurs, an error message is returned.
     """
+    route_name = 'sum_and_save'
+    logging.debug(f'Starting {route_name} process.')
     start_time = time.time()
-    id_run = None
-    id_script = 0 
+    id_run = None  # Initialize id_run for error handling
+
     try:
-        # Extract and validate request arguments from JSON payload
-        data = request.json
-        data["id_script"] = id_script        
-        arg1 = data.get("arg1")
-        arg2 = data.get("arg2")
+        # Parse the request data using parse_request_data()
+        data = parse_request_data()
+
+        # Set default id_script if not provided
+        data.setdefault("id_script", 0)
+
+        args = {
+        "arg1": data.get("arg1"),
+        "arg2": data.get("arg2")
+        }
 
         # Check for required parameters
-        if arg1 is None or arg2 is None:
-            log_and_raise(ValidationError, "arg1 and arg2 are required parameters", id_run=None)
+        if args["arg1"] is None or args["arg2"] is None:
+            log_and_raise(
+                ValidationError,
+                "arg1 and arg2 are required parameters",
+                id_run=id_run,
+                context=route_name
+            )
 
-        # Extract and validate metadata
+        # Extract and validate metadata using data_validation_metadata_generation
         metadata = data_validation_metadata_generation(data)
-        id_run = metadata["id_run"]
-        use_db = metadata["use_db"]
+        id_run = metadata.get("id_run")
+        use_db = metadata.get("use_db", True)
 
         # Log and save input arguments if necessary
         input_arguments = {"arg1": arg1, "arg2": arg2, **metadata}
-        log_to_api(metadata, log_message="sum_and_save starts.-", debug=False, warning=False, error=False, use_db=use_db)
-        
+        log_to_api(metadata, log_message=f'{route_name} starts.', use_db=use_db)
+
         if use_db and id_run:
             save_outcome_data(id_run, 0, 0, v_jsonb=input_arguments)
-            log_to_api(metadata, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db)
+            log_to_api(metadata, log_message="Outcome data saved successfully.", use_db=use_db)
 
         # Perform the summation and return the result
-        result = SumAndSave(arg1, arg2, id_run, use_db)
+        result_value = arg1 + arg2
+        result = {
+            "result": result_value,
+            "id_run": id_run
+        }
 
         # Calculate execution time
         execution_time_ms = int((time.time() - start_time) * 1000)
@@ -100,21 +116,19 @@ def sum_and_save_route():
         if use_db and id_run:
             save_outcome_data(id_run, 0, 1, v_integer=execution_time_ms)
 
-        log_to_api(metadata, log_message=f"execution_time_ms={execution_time_ms}", debug=False, warning=False, error=False, use_db=use_db)
-        log_to_api(metadata, log_message="sum_and_save ends.-", debug=False, warning=False, error=False, use_db=use_db)
+        log_to_api(metadata, log_message=f"execution_time_ms={execution_time_ms}", use_db=use_db)
+        log_to_api(metadata, log_message="sum_and_save ends.", use_db=use_db)
 
         return jsonify(result), 200
 
-    except ValidationError as e:
-        return jsonify(format_error_response("Service_sum", str(e), id_run)), 400  # 400 Bad Request
-    except APIError as e:
-        return jsonify(format_error_response("Service_sum", str(e), id_run)), 500  # 500 Internal Server Error
-    except ConnectionError as e:
-        return jsonify(format_error_response("Service_sum", str(e), id_run)), 503  # 503 Service Unavailable
-    except HTTPError as e:
-        return jsonify(format_error_response("Service_sum", str(e), id_run)), 502  # 502 Bad Gateway
     except Exception as e:
-        return jsonify(format_error_response("Service_sum", f"Unexpected error: {str(e)}", id_run)), 500  # 500 Internal Server Error
+        error_response, status_code = format_error_response(
+            service_name=service_data.get('service_name', 'Service_sum'),
+            route_name=route_name,
+            exception=e,
+            id_run=id_run
+        )
+        return jsonify(error_response), status_code
 
 
 
