@@ -1,35 +1,99 @@
 """
 Utilities_Architecture.py
 
-This module contains utility functions to interact with a specific API for logging and managing run outcomes and port assignments.
+This module contains utility functions to interact with a specific API for logging, user identification, managing run outcomes, and handling API requests.
 
 Functions:
-    log_to_api(id_run, log_message, debug=False, warning=False, error=False):
-        Logs a message to the API with an associated run ID and log type indicators.
+    log_to_api(metadata, log_message, debug=False, warning=False, error=False, use_db=True):
+        Sends a log message to the API with an associated run ID and log type indicators.
 
-    get_new_runid(idscript, id_category=None, FatherRunid=None):
+        Args:
+            metadata (dict): Contains metadata, including:
+                - id_run (int): The run ID associated with the log message.
+                - user (str): Username for authentication.
+                - password (str): Password for authentication.
+            log_message (str): The log message to send.
+            debug (bool, optional): Indicates if the log is a debug message. Defaults to False.
+            warning (bool, optional): Indicates if the log is a warning message. Defaults to False.
+            error (bool, optional): Indicates if the log is an error message. Defaults to False.
+            use_db (bool, optional): Determines whether to send the log to the API or just print it. Defaults to True.
+
+    get_new_runid(metadata):
         Generates a new run ID for a script and logs the operation.
 
-    get_data_type(id_category, id_type):
+        Args:
+            metadata (dict): Contains the necessary data to create a new run ID, including:
+                - id_script (int): The unique identifier for the script whose run ID is being created.
+                - id_user (int): The unique identifier for the user.
+                - id_father_service (int, optional): The identifier of the father service.
+                - id_father_run (str, optional): The run ID of the parent operation, if applicable.
+                - user (str): Username for authentication.
+                - password (str): Password for authentication.
+
+    update_run_status(metadata, status=None):
+        Updates the run status using the provided metadata and optional status value.
+
+        Args:
+            metadata (dict): Contains the necessary data to update the run status, including:
+                - id_run (int): The run ID to update.
+                - user (str): Username for authentication.
+                - password (str): Password for authentication.
+            status (int, optional): The new status value to set. Defaults to None.
+
+    user_identify(metadata):
+        Identifies the user by calling the user validation API and updates the run status accordingly.
+
+        Args:
+            metadata (dict): Contains necessary information to identify the user and update run status, including:
+                - user (str): The username for authentication.
+                - password (str): The password for authentication.
+                - id_run (int): The run ID for logging and updating the run.
+
+    get_data_type(id_category, id_type, id_run=None):
         Fetches data types from the API based on category and type IDs.
+
+        Args:
+            id_category (int): The ID of the category to filter the data types.
+            id_type (int): The ID of the type to filter the data types.
+            id_run (int, optional): The ID of the associated run for logging purposes. Defaults to None.
 
     save_outcome_data(new_run_id, id_category, id_type, v_integer=None, v_float=None, v_string=None, v_boolean=None, v_timestamp=None, v_jsonb=None):
         Submits outcome data for a given run ID.
 
-    get_projecttype(projectname=None, id_project=None):
-        Fetches project type information based on project name or project ID.
+        Args:
+            new_run_id (int): The new run ID for which to save the outcome.
+            id_category (int): The category ID for the outcome.
+            id_type (int): The type ID for the outcome.
+            v_integer (int, optional): An integer value associated with the outcome.
+            v_float (float, optional): A floating-point value associated with the outcome.
+            v_string (str, optional): A string value associated with the outcome.
+            v_boolean (bool, optional): A boolean value associated with the outcome.
+            v_timestamp (datetime, optional): A timestamp associated with the outcome. Defaults to None.
+            v_jsonb (dict, optional): A JSONB field containing additional data.
 
-    v1.0 Init
-    v1.1 Added use_db parameter to log_to_api
-    v1.2 Improved Error Handling new_run, get_data_type
+    update_run_fields(id_run, id_user=None, status=None):
+        Updates fields of a run, such as user ID and status.
+
+        Args:
+            id_run (int): The ID of the run to update.
+            id_user (int, optional): The user ID to update. Defaults to None.
+            status (int, optional): The status to update. Defaults to None.
+
+    handle_api_request(url, payload=None, method='POST', id_run=None):
+        Sends an API request with error handling and logging.
+
+        Args:
+            url (str): The URL of the API endpoint to which the request is sent.
+            payload (dict, optional): The data to be sent in the request body (for POST) or as query parameters (for GET). Defaults to None.
+            method (str, optional): The HTTP method to use for the request ('POST' or 'GET'). Defaults to 'POST'.
+            id_run (int, optional): The ID of the associated run for logging purposes. Defaults to None.
 """
-
 
 import requests
 import os
 from datetime import datetime
 import logging
-from Utilities_error_handling import log_and_raise,handle_exceptions,APIError,HTTPError
+from Utilities_error_handling import log_and_raise,handle_exceptions,APIError,HTTPError,ValidationError
 
 # Obtener host y puerto desde variables de entorno
 db_manager_HOST = os.getenv('db_manager_HOST', 'localhost')
@@ -40,15 +104,16 @@ service_name ='240813_service_sum_pydock'
 
 
 
-def log_to_api(id_run, log_message, user, password, debug=False, warning=False, error=False, use_db=True):
+def log_to_api(metadata, log_message, debug=False, warning=False, error=False, use_db=True):
     """
     Sends a log message to the API endpoint with proper error handling.
 
     Args:
-        id_run (int): The run ID associated with the log message.
+        metadata (dict): Contains metadata, including:
+            - id_run (int): The run ID associated with the log message.
+            - user (str): Username for authentication.
+            - password (str): Password for authentication.
         log_message (str): The log message to send.
-        user (str): Username for authentication.
-        password (str): Password for authentication.
         debug (bool, optional): Indicates if the log is a debug message. Defaults to False.
         warning (bool, optional): Indicates if the log is a warning message. Defaults to False.
         error (bool, optional): Indicates if the log is an error message. Defaults to False.
@@ -62,7 +127,12 @@ def log_to_api(id_run, log_message, user, password, debug=False, warning=False, 
     
     # Prepend timestamp to the log message
     log_message_with_timestamp = f"{timestamp} {log_message}"
-    
+
+    # Extract values from metadata
+    id_run = metadata.get('id_run')
+    user = metadata.get('user')
+    password = metadata.get('password')
+
     if not use_db or id_run is None:
         print(log_message_with_timestamp)  # Print the log message with timestamp
         return
@@ -92,7 +162,9 @@ def log_to_api(id_run, log_message, user, password, debug=False, warning=False, 
         # Instead, we can print the error message
         print(f"Error logging to API: {str(e)}")
 
-def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, id_father_run=None,user=None,password=None):
+
+
+def get_new_runid(metadata):
     """
     Generates a new run ID by sending a request to the /create_new_run API endpoint with the script ID,
     user ID, optional parent run ID, and optional father service ID. The method dynamically determines the table name
@@ -102,11 +174,13 @@ def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, 
     If successful, it returns the new run ID; otherwise, it logs the error and returns the error details.
 
     Args:
-        id_script (int): The unique identifier for the script whose run ID is being created.
-        id_user (int): The unique identifier for the user.
-        id_father_service (int, optional): The identifier of the father service. Required if id_father_run is provided.
-        id_category (int, optional): The category ID of the script. If not provided, a default value is used.
-        id_father_run (str, optional): The run ID of the parent operation, if applicable.
+        metadata (dict): A dictionary containing the necessary data to create the run ID, including:
+            - id_script (int): The unique identifier for the script whose run ID is being created.
+            - id_user (int): The unique identifier for the user.
+            - id_father_service (int, optional): The identifier of the father service.
+            - id_father_run (str, optional): The run ID of the parent operation, if applicable.
+            - user (str): The username for authentication.
+            - password (str): The password for authentication.
 
     Returns:
         dict: The new run ID if the creation was successful; otherwise, a dictionary with error details.
@@ -117,30 +191,31 @@ def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, 
 
     payload = {
         'service_name': service_name,
-        'id_script': id_script,
-        'id_user': id_user,
-        'father_service_id': id_father_service,
-        'id_run_father': id_father_run,
-        'user': user,
-        'password': password                
+        'id_script': metadata.get('id_script'),
+        'id_user': metadata.get('id_user'),
+        'father_service_id': metadata.get('id_father_service'),
+        'id_run_father': metadata.get('id_father_run'),
+        'user': metadata.get('user'),
+        'password': metadata.get('password')
     }
 
     url = f"{BASE_URL}/create_new_run"
 
     try:
-        # Use handle_api_request from Utilities_Architecture.py to send the API request
+        # Use handle_api_request to send the API request
         new_run_response = handle_api_request(url, payload=payload, method='POST')
 
         # Process the response
         new_run_id = new_run_response.get('id_run')
         if new_run_id:
-            log_to_api(new_run_id, f"New run ID created: {new_run_id} for script ID: {id_script} in service {service_name}", debug=True,user=user,password=password)
+            log_to_api(metadata,f"New run ID created: {new_run_id} for script ID: {metadata.get('id_script')} in service {service_name}",debug=True)
             return {'id_run': new_run_id}
         else:
             log_and_raise(APIError, "Run ID not found in the response", id_run=None, context="get_new_runid")
-        
+
     except Exception as e:
         log_and_raise(APIError, f"Error in get_new_runid: {str(e)}", id_run=None, context="get_new_runid")
+
 
 def update_run_fields(id_run, id_user=None, status=None):
     """
@@ -261,44 +336,6 @@ def save_outcome_data(new_run_id, id_category, id_type, v_integer=None, v_float=
         print(f"Failed to save outcome. Response: {outcome_response.text}")  # Adjust this to appropriate logging
         return False
 
-def get_projecttype(projectname=None, id_project=None):
-    """
-    Fetches project type based on project name or project ID.
-
-    Parameters:
-    - projectname (str, optional): The name of the project.
-    - id_project (int, optional): The ID of the project.
-
-    Returns:
-    - A JSON response containing the project types matching the criteria, or None if an error occurred.
-    """
-    base_url = f'{BASE_URL}/get_data_run_types'
-    params = {}
-
-    # Add parameters to the query string if they are provided
-    if projectname is not None:
-        params['type_name'] = projectname
-    if id_project is not None:
-        params['id_type'] = id_project
-    params['id_category'] = 4
-    # Make the GET request with the query parameters
-    try:
-        response = requests.get(base_url, params=params)
-        
-        if response.status_code == 200:
-            # If the request was successful, parse and return the JSON data
-            project_types = response.json()
-            log_to_api(0, f"Successfully fetched project types: {project_types}", debug=True)  # Example log, adjust as necessary
-            return project_types
-        else:
-            # Log and return None if the request was unsuccessful
-            log_to_api(0, f"Failed to fetch project types. Status code: {response.status_code}", debug=True, error=True)
-            return None
-    except Exception as e:
-        # Log any exceptions that occur during the request
-        log_to_api(0, f"Exception occurred while fetching project types: {e}", debug=True, error=True)
-        return None
-
 def handle_api_request(url, payload=None, method='POST', id_run=None):
     """
     Sends an API request with error handling and logging.
@@ -339,17 +376,16 @@ def handle_api_request(url, payload=None, method='POST', id_run=None):
         log_to_api(id_run, f"Exception in handle_api_request: {str(e)}", error=True)
         raise  # Re-raise the exception to propagate it upstream
 
-def update_run_status(id_run, user, password, status=None, id_user=None):
+def update_run_status(metadata, status=None):
     """
     Updates the run with the given id_run by making a POST request to the /update_run_status endpoint.
 
     Args:
-        id_run (int): The run ID to update.
-        service_name (str): The name of the service.
-        user (str): Username for authentication.
-        password (str): Password for authentication.
+        metadata (dict): A dictionary containing the necessary data to update the run, including:
+            - id_run (int): The run ID to update.
+            - user (str): Username for authentication.
+            - password (str): Password for authentication.
         status (int, optional): The new status value to set.
-        id_user (int, optional): The new id_user value to set.
 
     Returns:
         dict: The response from the API.
@@ -358,17 +394,91 @@ def update_run_status(id_run, user, password, status=None, id_user=None):
         Exception: If the API call fails.
     """
     payload = {
-        'id_run': id_run,
-        'service_name': service_name,
-        'user': user,
-        'password': password,
+        'id_run': metadata.get('id_run'),
+        'service_name': service_name,  # Assuming service_name is set globally
+        'user': metadata.get('user'),
+        'password': metadata.get('password'),
     }
+    
     if status is not None:
         payload['status'] = status
-    if id_user is not None:
-        payload['id_user'] = id_user
 
     url = f"{BASE_URL}/update_run_status"
 
-    response = handle_api_request(url, payload=payload)
-    return response
+    try:
+        # Use handle_api_request to send the API request
+        response = handle_api_request(url, payload=payload)
+        
+        # If there's an error in the response, raise an error with proper logging
+        if 'error' in response:
+            log_and_raise(APIError, f"Error updating run status: {response['error']}", id_run=metadata.get('id_run'), context="update_run_status")
+
+        # Return the response if successful
+        return response
+
+    except Exception as e:
+        # Handle any unexpected errors and log them properly
+        log_and_raise(APIError, f"Error in update_run_status: {str(e)}", id_run=metadata.get('id_run'), context="update_run_status")
+
+
+
+def user_identify(metadata):
+    """
+    Identifies the user by calling the user validation API and updates the run status accordingly.
+
+    Args:
+        metadata (dict): A dictionary containing necessary information including:
+            - user (str): The username for authentication.
+            - password (str): The password for authentication.
+            - id_run (int): The run ID for logging and updating the run.
+
+    Returns:
+        int: User ID if valid.
+
+    Raises:
+        ValidationError: If the request fails or the user is invalid.
+    """
+    # Get user manager host and port from environment variables
+    user_manager_host = os.getenv("user_manager_host", "localhost")
+    user_manager_port = os.getenv("user_manager_port", "20070")
+    url = f"http://{user_manager_host}:{user_manager_port}/user_validation"
+
+    payload = {
+        "user": metadata.get("user"),
+        "pswrd": metadata.get("password"),
+    }
+
+    id_run = metadata.get("id_run")
+
+    # Call the user validation API
+    try:
+        result = handle_api_request(url, payload=payload, id_run=id_run)
+        user_id = result.get("id_user")
+
+        # Check if user_id exists
+        if user_id is None:
+            log_and_raise(
+                ValidationError,
+                "User ID not found in the API response",
+                id_run=id_run,
+                context="user_identify",
+            )
+
+        # Update metadata with the user_id
+        metadata["id_user"] = user_id
+        log_to_api(metadata, f"User identified successfully: id_user={user_id}", debug=True, use_db=True)
+
+        # If user validation is successful, update the run with the user_id and status
+        update_response = update_run_status(metadata, status=1)
+
+        if "error" in update_response:
+            error_message = f"Failed to update run with id_run: {id_run}. Error: {update_response['error']}"
+            log_and_raise(
+                APIError, error_message, id_run=id_run, context="user_identify"
+            )
+
+        return user_id
+
+    except Exception as e:
+        # Handle and raise exceptions
+        log_and_raise(APIError, f"Error in user_identify: {str(e)}", id_run=id_run, context="user_identify")

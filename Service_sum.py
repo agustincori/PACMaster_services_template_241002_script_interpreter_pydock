@@ -32,7 +32,7 @@ import os
 import logging
 from flask import Flask, request, jsonify, render_template
 from waitress import serve
-from Utilities_Main import SumAndSave, extract_and_validate_metadata
+from Utilities_Main import SumAndSave, data_validation_metadata_generation
 from Utilities_Architecture import log_to_api, save_outcome_data
 from Utilities_error_handling import log_and_raise, format_error_response, ValidationError, HTTPError, APIError
 
@@ -56,7 +56,7 @@ def sum_and_save_route():
     - id_father_run (int, optional): Identifier for the parent run, if part of a larger process.
     - id_father_service (int, optional): Identifier for the parent service, required if `id_father_run` is provided.
     - user (str): Username for authentication. (Required)
-    - pswrd (str): Password for authentication. (Required)
+    - password (str): Password for authentication. (Required)
     - use_db (bool, optional): Flag to indicate whether to log the operation and its metadata to the database. Defaults to True.
 
     Returns:
@@ -65,7 +65,7 @@ def sum_and_save_route():
     """
     start_time = time.time()
     id_run = None
-    id_script=0
+    id_script = 0 
     try:
         # Extract and validate request arguments from JSON payload
         data = request.json
@@ -78,20 +78,17 @@ def sum_and_save_route():
             log_and_raise(ValidationError, "arg1 and arg2 are required parameters", id_run=None)
 
         # Extract and validate metadata
-        metadata, error_response = extract_and_validate_metadata(data)
-        if error_response:
-            return jsonify(error_response), error_response["status"]
-
-        id_run = metadata["new_run_id"]
+        metadata = data_validation_metadata_generation(data)
+        id_run = metadata["id_run"]
         use_db = metadata["use_db"]
 
         # Log and save input arguments if necessary
         input_arguments = {"arg1": arg1, "arg2": arg2, **metadata}
-        log_to_api(id_run=id_run, log_message="sum_and_save starts.-", debug=False, warning=False, error=False, use_db=use_db,user=metadata.user,password=metadata.password)
+        log_to_api(metadata, log_message="sum_and_save starts.-", debug=False, warning=False, error=False, use_db=use_db)
         
         if use_db and id_run:
             save_outcome_data(id_run, 0, 0, v_jsonb=input_arguments)
-            log_to_api(id_run=id_run, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db,user=metadata.user,password=metadata.password)
+            log_to_api(metadata, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db)
 
         # Perform the summation and return the result
         result = SumAndSave(arg1, arg2, id_run, use_db)
@@ -103,8 +100,8 @@ def sum_and_save_route():
         if use_db and id_run:
             save_outcome_data(id_run, 0, 1, v_integer=execution_time_ms)
 
-        log_to_api(id_run=id_run, log_message=f"execution_time_ms={execution_time_ms}", debug=False, warning=False, error=False, use_db=use_db,user=metadata.user,password=metadata.password)
-        log_to_api(id_run=id_run, log_message="sum_and_save ends.-", debug=False, warning=False, error=False, use_db=use_db,user=metadata.user,password=metadata.password)
+        log_to_api(metadata, log_message=f"execution_time_ms={execution_time_ms}", debug=False, warning=False, error=False, use_db=use_db)
+        log_to_api(metadata, log_message="sum_and_save ends.-", debug=False, warning=False, error=False, use_db=use_db)
 
         return jsonify(result), 200
 
@@ -118,6 +115,7 @@ def sum_and_save_route():
         return jsonify(format_error_response("Service_sum", str(e), id_run)), 502  # 502 Bad Gateway
     except Exception as e:
         return jsonify(format_error_response("Service_sum", f"Unexpected error: {str(e)}", id_run)), 500  # 500 Internal Server Error
+
 
 
 @app.route("/")
