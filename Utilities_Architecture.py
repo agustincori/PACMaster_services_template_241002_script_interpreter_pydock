@@ -40,34 +40,57 @@ service_name ='240813_service_sum_pydock'
 
 
 
-def log_to_api(id_run, log_message, debug=False, warning=False, error=False, use_db=True):
+def log_to_api(id_run, log_message, user, password, debug=False, warning=False, error=False, use_db=True):
+    """
+    Sends a log message to the API endpoint with proper error handling.
+
+    Args:
+        id_run (int): The run ID associated with the log message.
+        log_message (str): The log message to send.
+        user (str): Username for authentication.
+        password (str): Password for authentication.
+        debug (bool, optional): Indicates if the log is a debug message. Defaults to False.
+        warning (bool, optional): Indicates if the log is a warning message. Defaults to False.
+        error (bool, optional): Indicates if the log is an error message. Defaults to False.
+        use_db (bool, optional): Determines whether to send the log to the API or just print it. Defaults to True.
+
+    Returns:
+        None
+    """
     # Get current timestamp in the desired format
     timestamp = datetime.now().strftime('%H:%M:%S:%f')[:-3]  # '%f' gives microseconds, slicing to get milliseconds
     
     # Prepend timestamp to the log message
     log_message_with_timestamp = f"{timestamp} {log_message}"
     
-    if not use_db or id_run==None: 
+    if not use_db or id_run is None:
         print(log_message_with_timestamp)  # Print the log message with timestamp
         return
-    
+
     # Prepare the data for the POST request
     log_data = {
+        'service_name': service_name,
         'id_run': id_run,
         'log': log_message_with_timestamp,
+        'user': user,
+        'password': password,
         'debug': debug,
         'warning': warning,
         'error': error
     }
-    
-    # Send the request to the Flask API
-    response = requests.post(f'{BASE_URL}/insert_log', json=log_data)
-    
-    # Check for errors in the response
-    if response.status_code != 201:
-        print(f"Error logging: {response.text}")
-    else:
+
+    url = f'{BASE_URL}/insert_log'
+
+    try:
+        # Use handle_api_request to send the request with proper error handling
+        response = handle_api_request(url, payload=log_data, method='POST', id_run=id_run)
+        # If the request is successful, print the log message
         print(log_message_with_timestamp)
+    except Exception as e:
+        # Handle exceptions using centralized error handling
+        # Since this is the logging function, we might not want to raise exceptions further
+        # Instead, we can print the error message
+        print(f"Error logging to API: {str(e)}")
 
 def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, id_father_run=None,user=None,password=None):
     """
@@ -111,7 +134,7 @@ def get_new_runid(id_script, id_user, id_father_service=None, id_category=None, 
         # Process the response
         new_run_id = new_run_response.get('id_run')
         if new_run_id:
-            log_to_api(new_run_id, f"New run ID created: {new_run_id} for script ID: {id_script} in service {service_name}", debug=True)
+            log_to_api(new_run_id, f"New run ID created: {new_run_id} for script ID: {id_script} in service {service_name}", debug=True,user=user,password=password)
             return {'id_run': new_run_id}
         else:
             log_and_raise(APIError, "Run ID not found in the response", id_run=None, context="get_new_runid")

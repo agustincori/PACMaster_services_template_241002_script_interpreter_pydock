@@ -87,11 +87,11 @@ def sum_and_save_route():
 
         # Log and save input arguments if necessary
         input_arguments = {"arg1": arg1, "arg2": arg2, **metadata}
-        log_to_api(id_run=id_run, log_message="sum_and_save starts.-", debug=False, warning=False, error=False, use_db=use_db)
+        log_to_api(id_run=id_run, log_message="sum_and_save starts.-", debug=False, warning=False, error=False, use_db=use_db,user=metadata.user,password=metadata.password)
         
         if use_db and id_run:
             save_outcome_data(id_run, 0, 0, v_jsonb=input_arguments)
-            log_to_api(id_run=id_run, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db)
+            log_to_api(id_run=id_run, log_message="Outcome data saved successfully.", debug=False, warning=False, error=False, use_db=use_db,user=metadata.user,password=metadata.password)
 
         # Perform the summation and return the result
         result = SumAndSave(arg1, arg2, id_run, use_db)
@@ -103,8 +103,8 @@ def sum_and_save_route():
         if use_db and id_run:
             save_outcome_data(id_run, 0, 1, v_integer=execution_time_ms)
 
-        log_to_api(id_run=id_run, log_message=f"execution_time_ms={execution_time_ms}", debug=False, warning=False, error=False, use_db=use_db)
-        log_to_api(id_run=id_run, log_message="sum_and_save ends.-", debug=False, warning=False, error=False, use_db=use_db)
+        log_to_api(id_run=id_run, log_message=f"execution_time_ms={execution_time_ms}", debug=False, warning=False, error=False, use_db=use_db,user=metadata.user,password=metadata.password)
+        log_to_api(id_run=id_run, log_message="sum_and_save ends.-", debug=False, warning=False, error=False, use_db=use_db,user=metadata.user,password=metadata.password)
 
         return jsonify(result), 200
 

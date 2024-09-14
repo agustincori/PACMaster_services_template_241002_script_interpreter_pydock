@@ -153,9 +153,9 @@ def extract_and_validate_metadata(data):
         return {
             "id_father_run": data.get("id_father_run"),
             "id_father_service": data.get("id_father_service"),
-            "user": data.get("user"),
+            "user": id_user,
             "use_db": use_db,
-            "new_run_id": new_run_id
+            "id_run": new_run_id
         }, None
 
     except Exception as e:
