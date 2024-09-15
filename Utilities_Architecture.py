@@ -92,7 +92,7 @@ Functions:
 import requests
 import os
 from datetime import datetime
-import logging
+import time
 from Utilities_error_handling import log_and_raise,handle_exceptions,APIError,HTTPError,ValidationError
 
 # Obtener host y puerto desde variables de entorno
@@ -213,7 +213,7 @@ def get_new_runid(metadata):
         # Process the response
         new_run_id = new_run_response.get('id_run')
         if new_run_id:
-            log_to_api(metadata,f"New run ID created: {new_run_id} for script ID: {metadata.get('id_script')} in service {service_name}",debug=True)
+            log_to_api(metadata,f"New run ID created: {new_run_id} for script ID: {metadata.get('id_script')} in service {service_name}. Executed in {new_run_response.get('execution_time_ms')} ms.",debug=True)
             return {'id_run': new_run_id}
         else:
             log_and_raise(APIError, "Run ID not found in the response", id_run=None, context="get_new_runid")
@@ -292,8 +292,8 @@ def get_data_type(id_category, id_type, id_run=None):
         # Log the exception before raising it further
         log_to_api(id_run, f"Exception in get_data_type: {str(e)}", error=True)
         raise
-    
-def save_outcome_data(new_run_id, id_category, id_type, v_integer=None, v_float=None, v_string=None, v_boolean=None, v_timestamp=None, v_jsonb=None):
+
+def save_outcome_data(metadata, id_category, id_type, v_integer=None, v_float=None, v_string=None, v_boolean=None, v_timestamp=None, v_jsonb=None):
     """
     Submits outcome data for a given run ID directly to the new architecture, accommodating various types of outcome data including a JSONB field.
 
@@ -313,7 +313,7 @@ def save_outcome_data(new_run_id, id_category, id_type, v_integer=None, v_float=
     """
     # Prepare the outcome data based on provided arguments
     outcome_data = {
-        'id_run': new_run_id,
+        'id_run': metadata.get('id_run'),
         'id_category': id_category,
         'id_type': id_type,
         'v_integer': v_integer,
@@ -350,6 +350,7 @@ def update_run_status(metadata, status=None):
             - id_run (int): The run ID to update.
             - user (str): Username for authentication.
             - password (str): Password for authentication.
+            - script_start_time
         status (int, optional): The new status value to set.
 
     Returns:
@@ -377,7 +378,9 @@ def update_run_status(metadata, status=None):
         # If there's an error in the response, raise an error with proper logging
         if 'error' in response:
             log_and_raise(APIError, f"Error updating run status: {response['error']}", id_run=metadata.get('id_run'), context="update_run_status")
-
+        executed_time_ms=int((time.time() - metadata.get("script_start_time")) * 1000)
+        log_to_api(metadata,f"Run status has been updated to: {status}. Executed in {executed_time_ms}ms since script started.",debug=True)
+        save_outcome_data(metadata=metadata,id_category=1,id_type=0,v_string=f"status={status}",v_integer=executed_time_ms)
         # Return the response if successful
         return response
 
@@ -431,16 +434,7 @@ def user_identify(metadata):
 
         # Update metadata with the user_id
         metadata["id_user"] = id_user
-        log_to_api(metadata, f"User identified successfully: id_user={id_user}", debug=True, use_db=True)
-
-        # If user validation is successful, update the run with the user_id and status
-        update_response = update_run_status(metadata, status=1)
-
-        if "error" in update_response:
-            error_message = f"Failed to update run with id_run: {id_run}. Error: {update_response['error']}"
-            log_and_raise(
-                APIError, error_message, id_run=id_run, context="user_identify"
-            )
+        log_to_api(metadata, f"User identified successfully: id_user={id_user}. Executed in {result.get('execution_time_ms')} ms.", debug=True, use_db=True)
 
         return id_user
 

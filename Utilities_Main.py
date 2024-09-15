@@ -1,15 +1,15 @@
 # Utilities_Main.py
 import yaml
-from Utilities_Architecture import log_to_api, get_new_runid, save_outcome_data,user_identify
+from Utilities_Architecture import log_to_api, get_new_runid, save_outcome_data,user_identify,update_run_status
 from Utilities_error_handling import log_and_raise, handle_exceptions, APIError,ValidationError
 from flask import request
 
-def sum_and_save(args, metadata, use_db=True):
+def sum_and_save(data, metadata, use_db=True):
     """
     Computes the sum of two numbers and saves the arguments and the result.
 
     Parameters:
-    - args (dict): A dictionary containing the arguments. Should contain 'arg1' and 'arg2'.
+    - data (dict): A dictionary containing the arguments. Should contain 'arg1' and 'arg2'.
     - metadata (dict): A dictionary containing metadata, including 'id_run'.
     - use_db (bool): Whether to use database connection for logging and saving outcome data. Defaults to True.
 
@@ -24,14 +24,14 @@ def sum_and_save(args, metadata, use_db=True):
 
     try:
         # Extract arguments
-        arg1 = args.get('arg1')
-        arg2 = args.get('arg2')
+        arg1 = data.get('arg1')
+        arg2 = data.get('arg2')
 
         # Check if arg1 and arg2 are provided
         if arg1 is None or arg2 is None:
             log_and_raise(
                 ValidationError,
-                "arg1 and arg2 are required in args dictionary",
+                "arg1 and arg2 are required in data dictionary",
                 id_run=id_run,
                 context="sum_and_save"
             )
@@ -104,6 +104,7 @@ def data_validation_metadata_generation(data):
         "use_db": data.get("use_db", True),
         "id_run": None,  # This will be set later if use_db is True
         "id_user": None, # This will be set by validate_user
+        "script_start_time":data.get("script_start_time")
     }
 
     def validate_user(metadata):
@@ -163,13 +164,12 @@ def data_validation_metadata_generation(data):
         metadata["id_run"] = new_run_id_response.get('id_run')
 
     try:
-        # Create a new run ID if use_db is True
         if metadata["use_db"]:
-            handle_exceptions(lambda: create_new_run_id(metadata), context="method: create_new_run_id")
+            handle_exceptions(lambda: create_new_run_id(metadata), context="method: create_new_run_id")     # Create a new run ID 
+            handle_exceptions(lambda: validate_user(metadata), context="method: validate_user_credentials") # Validate user
 
-        # Validate user
-        handle_exceptions(lambda: validate_user(metadata), context="method: validate_user_credentials")
-
+        # If user validation is successful, update the run with the user_id and status
+        update_run_status(metadata, status=1)
         # Return the updated metadata
         return metadata
 

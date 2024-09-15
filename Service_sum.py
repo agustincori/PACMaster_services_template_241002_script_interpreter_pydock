@@ -55,37 +55,38 @@ def sum_and_save_route():
     """
     
     
-    start_time = time.time()
+    script_start_time = time.time()
     route_name = 'sum_and_save_route'
     logging.debug(f'Starting {route_name} process.')
     id_run = None  # Initialize id_run for error handling
     id_script=1
     try:
         # Parse the request data using parse_request_data()
-        data = parse_request_data()
+        input_json = parse_request_data()
 
         # Set default id_script if not provided
-        data.setdefault("id_script", id_script)
-
+        input_json.setdefault("id_script", id_script)
+        input_json.setdefault("script_start_time", script_start_time)
         # Extract arguments
-        args = {
-            "arg1": data.get("arg1"),
-            "arg2": data.get("arg2")
+        data = {
+            "arg1": input_json.get("arg1"),
+            "arg2": input_json.get("arg2")
         }
 
         # Extract and validate metadata using data_validation_metadata_generation
-        metadata = data_validation_metadata_generation(data)
+        metadata = data_validation_metadata_generation(input_json)
         id_run = metadata.get("id_run")
         use_db = metadata.get("use_db", True)
-
+        if use_db and id_run:
+            save_outcome_data(metadata=metadata,id_category=1,id_type=0,v_string="data_validation_metadata_generation executed succesfully",v_integer=execution_time_ms)
         # Log the start of the operation
         log_to_api(metadata, log_message=f'{route_name} starts.', use_db=use_db)
 
         # Perform the summation by calling the sum_and_save function
-        result_data = sum_and_save(args, metadata, use_db=use_db)
+        result_data = sum_and_save(data, metadata, use_db=use_db)
 
         # Calculate execution time
-        execution_time_ms = int((time.time() - start_time) * 1000)
+        execution_time_ms = int((time.time() - script_start_time) * 1000)
         result_data["execution_time_ms"] = execution_time_ms
 
         # Save execution time if using the database
@@ -98,7 +99,7 @@ def sum_and_save_route():
             )
 
         # Log the execution time and end of the operation
-        log_to_api(metadata, log_message=f"execution_time_ms={execution_time_ms}", use_db=use_db)
+        log_to_api(metadata, log_message=f"total execution_time_ms={execution_time_ms}", use_db=use_db)
         log_to_api(metadata, log_message=f"{route_name} ends.", use_db=use_db)
 
         return jsonify(result_data), 200
