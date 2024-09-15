@@ -1,0 +1,30 @@
+<h3>POST /sum_and_save</h3>
+<p><b class="parameter">Description:</b> This route computes the sum of two numbers and saves the arguments and the result.</p>
+<p><b class="important">Parameters:</b></p>
+<ul class="indent">
+    <li><b class="parameter">arg1:</b> The first number (int or float)</li>
+    <li><b class="parameter">arg2:</b> The second number (int or float)</li>
+    <li><b class="parameter">user:</b> The username for authentication (string)</li>
+    <li><b class="parameter">password:</b> The password for authentication (string)</li>
+    <!-- Add any additional metadata parameters if necessary -->
+</ul>
+<p><b class="important">Example Payload:</b></p>
+<textarea id="jsonPayload_sum_and_save" rows="8" cols="50">
+{
+  "arg1": 10,
+  "arg2": 20,
+  "user": "PAC",
+  "password": "pda)cYh(oBo6blBN@4n0e)U6UCOicJYe"
+}
+</textarea>
+<br>
+<p><label for="format_sum_and_save">Select format:</label></p>
+<select id="format_sum_and_save" onchange="updatePayloadFormat('sum_and_save')">
+    <option value="json">JSON</option>
+    <option value="yaml">YAML</option>
+</select>
+<br>
+<button onclick="executePost('sum_and_save')">Execute POST</button>
+
+<h3>Result:</h3>
+<textarea id="resultBox_sum_and_save" rows="8" cols="50" readonly></textarea>
