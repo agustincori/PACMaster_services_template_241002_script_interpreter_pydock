@@ -1,8 +1,8 @@
 # Utilities_Main.py
 import yaml
-from Utilities_Architecture import log_to_api, get_new_runid, save_outcome_data,user_identify,update_run_status
-from Utilities_error_handling import log_and_raise, handle_exceptions, APIError,HTTPError,ValidationError
-from flask import request,abort
+from Utilities_Architecture import log_to_api, get_new_runid, save_outcome_data,user_identify
+from Utilities_error_handling import log_and_raise, handle_exceptions, APIError,ValidationError
+from flask import request
 
 def sum_and_save(args, metadata, use_db=True):
     """
@@ -20,7 +20,6 @@ def sum_and_save(args, metadata, use_db=True):
     - ValidationError: If arg1 or arg2 are missing or not numbers.
     - Exception: For any other exceptions during the summation.
     """
-
     id_run = metadata.get('id_run')
 
     try:
@@ -50,26 +49,27 @@ def sum_and_save(args, metadata, use_db=True):
             )
 
         # Perform the summation
-        try:
-            result = arg1 + arg2
-        except Exception as e:
-            log_and_raise(
-                Exception,
-                f"An error occurred during summation: {e}",
-                id_run=id_run,
-                context="sum_and_save"
-            )
+        result = arg1 + arg2
 
         outcome_data = {"arg1": arg1, "arg2": arg2, "sum": result}
 
         if use_db and id_run is not None:
             log_to_api(metadata, log_message=f"Arguments: arg1 = {arg1}, arg2 = {arg2}, sum = {result}", use_db=use_db)
-            save_outcome_data(id_run, 1, 0, v_jsonb=outcome_data)
+            save_outcome_data(
+                metadata=metadata,
+                id_category=1,
+                id_type=0,
+                v_jsonb=outcome_data
+            )
             log_to_api(metadata, log_message="Outcome data saved successfully.", use_db=use_db)
         else:
             print("Outcome data:", outcome_data)
 
-        return outcome_data
+        # Return the result data
+        return {
+            "result": result,
+            "id_run": id_run
+        }
 
     except Exception as e:
         error_message = f"An unexpected error occurred: {e}"
@@ -77,7 +77,7 @@ def sum_and_save(args, metadata, use_db=True):
             log_to_api(metadata, log_message=error_message, error=True, use_db=use_db)
         # Log and raise the exception
         log_and_raise(
-            Exception,
+            type(e),
             error_message,
             id_run=id_run,
             context="sum_and_save"
