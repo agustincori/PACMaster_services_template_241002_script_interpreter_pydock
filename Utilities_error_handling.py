@@ -101,7 +101,7 @@ class HTTPError(CustomError):
         super().__init__(f"{message} [Status Code: {status_code}]", details)
         self.status_code = status_code
 
-def log_and_raise(exception_type, error_message, id_run=None, context=None, debug=False, warning=False, error=True, use_db=True):
+def log_and_raise(exception_type, error_message, original_exception=None, context=None):
     """
     Logs the provided error message to the API or falls back to local logging, then raises the provided exception.
     Automatically encapsulates the original error message with an additional context.
@@ -109,27 +109,27 @@ def log_and_raise(exception_type, error_message, id_run=None, context=None, debu
     Args:
         exception_type (CustomError): The type of exception to raise.
         error_message (str): The error message to log and raise.
-        id_run (int, optional): The ID of the associated run. Defaults to None.
+        original_exception (Exception, optional): The original exception object to preserve.
         context (str, optional): The context of the service where the error occurred. Defaults to None.
-        debug (bool, optional): Whether the log should be treated as a debug log. Defaults to False.
-        warning (bool, optional): Whether the log should be treated as a warning. Defaults to False.
-        error (bool, optional): Whether the log should be treated as an error. Defaults to True.
-        use_db (bool, optional): Whether the log should be saved to the database. Defaults to True.
     """
     try:
         # Add context to the error message for upstream tracking
         if context:
             error_message = f"{context} | {error_message}"
 
-        # Attempt to log to API
+        # Attempt to log to API (if applicable)
         # log_to_api(id_run, error_message, debug=debug, warning=warning, error=error, use_db=use_db)
-    except Exception as e:
+    except Exception as log_exception:
         # Fallback to local logging if API logging fails
-        logger.error(f"Failed to log to API: {e}")
+        logger.error(f"Failed to log to API: {log_exception}")
         logger.error(error_message)
 
-    # Raise the exception, preserving the original exception's details if possible
-    raise exception_type(error_message)
+    # If original_exception exists, raise a new exception with both messages and keep the original exception details
+    if original_exception:
+        # Create a new exception that includes both the error_message and the original exception's message
+        raise exception_type(f"{error_message}. Original exception: {str(original_exception)}") from original_exception
+    else:
+        raise exception_type(error_message)
 
 
 def format_error_response(service_name, route_name, exception, id_run=None):
@@ -151,15 +151,22 @@ def format_error_response(service_name, route_name, exception, id_run=None):
         APIError: 502,         # Bad Gateway
         ConnectionError: 503,   # Service Unavailable
         HTTPError: 500,        # Internal Server Error
-        Exception: 500         # Internal Server Error for any other exceptions
+        Exception: 500         # Default to Internal Server Error
     }
 
+    # Helper function to get the closest matching status code based on exception type
+    def get_status_code(exception):
+        for exc_type, code in exception_status_code_mapping.items():
+            if isinstance(exception, exc_type):
+                return code
+        return 500  # Default to 500 Internal Server Error
+
     # Get the status code based on the exception type
-    status_code = exception_status_code_mapping.get(type(exception), 500)
+    status_code = get_status_code(exception)
 
     # Extract additional details if available
     details = getattr(exception, 'details', None)
-    status_code = getattr(exception, 'status_code', status_code)
+    status_code = getattr(exception, 'status_code', status_code)  # Allow exception to override status_code
 
     # Create the error response
     error_response = {
@@ -167,8 +174,10 @@ def format_error_response(service_name, route_name, exception, id_run=None):
         "route_name": route_name,
         "error": str(exception),
         "id_run": id_run,
-        "details": details
+        "status_code": status_code  # Add status code to the error response JSON
     }
+    if details is not None:
+        error_response["details"] = details
 
     return error_response, status_code
 
@@ -193,16 +202,18 @@ def handle_exceptions(func, context=None, id_run=None):
         return func()
 
     except APIError as e:
-        log_and_raise(APIError, f"{context} | {str(e)}", id_run=id_run, context=context)
+        log_and_raise(APIError, f"{context} | {str(e)}", original_exception=e, context=context)
     except HTTPError as e:
-        log_and_raise(HTTPError, f"{context} | {str(e)}", id_run=id_run, context=context)
+        log_and_raise(HTTPError, f"{context} | {str(e)}", original_exception=e, context=context)
     except requests.Timeout as e:
-        log_and_raise(APIError, f"{context} | Timeout Error: {str(e)}", id_run=id_run, context=context)
+        log_and_raise(APIError, f"{context} | Timeout Error: {str(e)}", original_exception=e, context=context)
     except requests.ConnectionError as e:
-        log_and_raise(ConnectionError, f"{context} | Connection Error: {str(e)}", id_run=id_run, context=context)
+        log_and_raise(ConnectionError, f"{context} | Connection Error: {str(e)}", original_exception=e, context=context)
+    except requests.HTTPError as e:
+        log_and_raise(HTTPError, f"{context} | External Service Error: {str(e)}", original_exception=e, context=context)       
     except requests.RequestException as e:
-        log_and_raise(APIError, f"{context} | Request Error: {str(e)}", id_run=id_run, context=context)
+        log_and_raise(APIError, f"{context} | Request Error: {str(e)}", original_exception=e, context=context)
     except CustomError as e:
-        log_and_raise(type(e), f"{context} | {str(e)}", id_run=id_run, context=context)
+        log_and_raise(type(e), f"{context} | {str(e)}", original_exception=e, context=context)
     except Exception as e:
-        log_and_raise(APIError, f"{context} | Unexpected Error: {str(e)}", id_run=id_run, context=context)
+        log_and_raise(APIError, f"{context} | Unexpected Error: {str(e)}", original_exception=e, context=context)

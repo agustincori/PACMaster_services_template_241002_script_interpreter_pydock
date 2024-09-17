@@ -1,6 +1,6 @@
 # Utilities_Main.py
 import yaml
-from Utilities_Architecture import log_to_api, get_new_runid, save_outcome_data,user_identify,update_run_status
+from Utilities_Architecture import log_to_api, arq_get_new_id_run, arq_save_outcome_data,arq_user_identify,arq_update_run_fields
 from Utilities_error_handling import log_and_raise, handle_exceptions, APIError,ValidationError
 from flask import request
 
@@ -55,7 +55,7 @@ def sum_and_save(data, metadata, use_db=True):
 
         if use_db and id_run is not None:
             log_to_api(metadata, log_message=f"Arguments: arg1 = {arg1}, arg2 = {arg2}, sum = {result}", use_db=use_db)
-            save_outcome_data(
+            arq_save_outcome_data(
                 metadata=metadata,
                 id_category=1,
                 id_type=0,
@@ -111,71 +111,44 @@ def data_validation_metadata_generation(data):
         user = metadata.get("user")
         password = metadata.get("password")
         if user is None or password is None:
-            log_and_raise(
-                ValidationError,
-                "User and password are required for authentication",
-                id_run=metadata.get("id_run"),
-                context="validate_user"
-            )
+            log_and_raise(ValidationError,"User and password are required for authentication",id_run=metadata.get("id_run"),context="validate_user")
 
-        # Assume user_identify returns an id_user or None
-        id_user = user_identify(metadata)
+        # Assume arq_user_identify returns an id_user or None
+        id_user = arq_user_identify(metadata)
 
         if id_user is None:
-            log_and_raise(
-                ValidationError,
-                "Invalid credentials",
-                id_run=metadata.get("id_run"),
-                context="validate_user"
-            )
+            log_and_raise(ValidationError,"Invalid credentials",id_run=metadata.get("id_run"),context="validate_user")
 
         # Update metadata with id_user
         metadata["id_user"] = id_user
 
     def create_new_run_id(metadata):
         if metadata["id_father_run"] is not None and metadata["id_father_service"] is None:
-            log_and_raise(
-                ValidationError,
-                "id_father_service is required when id_father_run is provided",
-                id_run=metadata.get("id_run"),
-                context="create_new_run_id"
-            )
+            log_and_raise(ValidationError, "id_father_service is required when id_father_run is provided", id_run=metadata.get("id_run"), context="create_new_run_id")
 
         if metadata["id_script"] is None:
-            log_and_raise(
-                ValidationError,
-                "id_script is required and cannot be None",
-                id_run=metadata.get("id_run"),
-                context="create_new_run_id"
-            )
+            log_and_raise(ValidationError, "id_script is required and cannot be None", id_run=metadata.get("id_run"), context="create_new_run_id")
 
-        new_run_id_response = get_new_runid(metadata)
-
-        if 'error' in new_run_id_response:
-            details = new_run_id_response.get('message') or new_run_id_response.get('details') or 'No additional details provided.'
-            log_and_raise(
-                APIError,
-                f"Error creating new run ID: {new_run_id_response.get('error')} - Details: {details}",
-                id_run=metadata.get("id_run"),
-                context="create_new_run_id"
-            )
+        new_run_id_response = arq_get_new_id_run(metadata)
 
         # Update metadata with new run ID
         metadata["id_run"] = new_run_id_response.get('id_run')
 
     try:
         if metadata["use_db"]:
-            handle_exceptions(lambda: create_new_run_id(metadata), context="method: create_new_run_id")     # Create a new run ID 
+            #handle_exceptions(lambda: create_new_run_id(metadata), context="method: create_new_run_id")     # Create a new run ID 
+            create_new_run_id(metadata)
             handle_exceptions(lambda: validate_user(metadata), context="method: validate_user_credentials") # Validate user
 
         # If user validation is successful, update the run with the user_id and status
-        update_run_status(metadata, status=1)
+        arq_update_run_fields(metadata, milestone_msg='data_validation_metadata_generation done',id_user=metadata["id_user"])
         # Return the updated metadata
         return metadata
 
     except Exception as e:
         # log_and_raise will handle logging and raising of exceptions
-        log_and_raise(Exception, str(e), id_run=metadata.get("id_run"), context="data_validation_metadata_generation")
+        log_to_api(metadata, f"Exception in data_validation_metadata_generation: {str(e)}", error=True)
+        raise
 
     
 def parse_request_data():

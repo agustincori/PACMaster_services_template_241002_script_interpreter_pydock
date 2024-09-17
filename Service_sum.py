@@ -33,7 +33,7 @@ import logging
 from flask import Flask, request, jsonify, render_template
 from waitress import serve
 from Utilities_Main import sum_and_save, data_validation_metadata_generation,parse_request_data
-from Utilities_Architecture import log_to_api, save_outcome_data,service_data
+from Utilities_Architecture import log_to_api, arq_save_outcome_data,arq_update_run_fields,service_data
 from Utilities_error_handling import log_and_raise, format_error_response, ValidationError, HTTPError, APIError
 
 logging.basicConfig(level=logging.DEBUG)  # Configures logging to display all debug messages
@@ -78,7 +78,7 @@ def sum_and_save_route():
         id_run = metadata.get("id_run")
         use_db = metadata.get("use_db", True)
         if use_db and id_run:
-            save_outcome_data(metadata=metadata,id_category=1,id_type=0,v_string="data_validation_metadata_generation executed succesfully",v_integer=execution_time_ms)
+            arq_save_outcome_data(metadata=metadata,id_category=1,id_type=0,v_string="data_validation_metadata_generation executed succesfully",v_integer=execution_time_ms)
         # Log the start of the operation
         log_to_api(metadata, log_message=f'{route_name} starts.', use_db=use_db)
 
@@ -91,7 +91,7 @@ def sum_and_save_route():
 
         # Save execution time if using the database
         if use_db and id_run:
-            save_outcome_data(
+            arq_save_outcome_data(
                 metadata=metadata,
                 id_category=0,
                 id_type=1,
@@ -102,11 +102,13 @@ def sum_and_save_route():
         log_to_api(metadata, log_message=f"total execution_time_ms={execution_time_ms}", use_db=use_db)
         log_to_api(metadata, log_message=f"{route_name} ends.", use_db=use_db)
 
-        return jsonify(result_data), 200
+        succes_status=200
+        arq_update_run_fields(metadata, status=succes_status)
+        return jsonify(result_data), succes_status
 
     except Exception as e:
         error_response, status_code = format_error_response(
-            service_name=service_data.get('service_name', 'Service_sum'),
+            service_name=service_data.get('service_name'),
             route_name=route_name,
             exception=e,
             id_run=id_run
