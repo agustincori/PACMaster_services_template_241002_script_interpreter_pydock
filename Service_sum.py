@@ -59,7 +59,7 @@ def sum_and_save_route():
     route_name = 'sum_and_save_route'
     logging.debug(f'Starting {route_name} process.')
     id_run = None  # Initialize id_run for error handling
-    id_script=1
+    id_script=0
     try:
         # Parse the request data using parse_request_data()
         input_json = parse_request_data()
