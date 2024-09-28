@@ -94,6 +94,8 @@ import os
 from datetime import datetime
 import time
 from Utilities_error_handling import log_and_raise,handle_exceptions,APIError,HTTPError,ValidationError
+import base64
+import jwt
 
 # Obtener host y puerto desde variables de entorno
 db_manager_HOST = os.getenv('db_manager_HOST', 'localhost')
@@ -107,6 +109,9 @@ service_data = {
     'service_name': service_name,
     'id_service': id_service
 }
+
+# Set the secret key from environment variables or use a default value
+SECRET_KEY = os.getenv('SECRET_KEY', 'th3_s3cr3t_k3y')
 
 
 def log_to_api(metadata, log_message, debug=False, warning=False, error=False, use_db=True):
@@ -210,8 +215,9 @@ def arq_get_new_id_run(metadata):
 
         # Process the response
         new_run_id = new_run_response.get('id_run')
+        token=new_run_response.get('token')
         log_to_api(metadata,f"New run ID created: {new_run_id} for script ID: {metadata.get('id_script')} in service {service_name}. Executed in {new_run_response.get('execution_time_ms')} ms.",debug=True)
-        return {'id_run': new_run_id}
+        return {'id_run': new_run_id,'token': token}
 
 
     except Exception as e:
@@ -353,6 +359,7 @@ def arq_update_run_fields(metadata, status=None, milestone_msg=None, id_user=Non
             'service_name': service_data.get('service_name'),  # Assuming service_name is in metadata
             'user': metadata.get('user'),
             'password': metadata.get('password'),
+            'token': metadata.get('token'),
             'status': status
         }
 
@@ -514,10 +521,9 @@ def arq_handle_api_request(url, payload=None, metadata=None,method='POST'):
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
 
-        # If the response status code indicates an error, handle it
-        if response.status_code >= 400:
-            response.raise_for_status()
-
+        # If the response status code indicates an error, raise an HTTPError, 
+        # but capture the detailed response for further use
+        response.raise_for_status()
         return response
 
     try:
@@ -529,3 +535,116 @@ def arq_handle_api_request(url, payload=None, metadata=None,method='POST'):
         # Log the exception using log_to_api before re-raising it
         log_to_api(metadata, f"Exception in arq_handle_api_request: {str(e)}", error=True)
         raise
+
+
+
+
+
+class ArqValidations:
+    @staticmethod
+    def validate_auth(data):
+        """
+        Validates the user based on provided credentials or token.
+        
+        Args:
+            data (dict): A dictionary containing 'user', 'password', and 'token'.
+        
+        Returns:
+            dict: A dictionary containing 'id_user' and 'token' if valid.
+                  Example: { "id_user": 123, "token": "abcde12345" }
+                  
+        Raises:
+            ValidationError: If credentials or token are invalid.
+        """
+        user = data.get("user", None)
+        pswrd = data.get("password", None)
+        token = data.get("token", None)
+
+        if token:
+            try:
+                # Validate the token
+                id_user = ArqValidations.validate_token(token)
+                return {"id_user": id_user, "token": token}
+            except ValidationError as e:
+                # If token is expired or invalid, fall back to user identification
+                if "expired" in str(e):
+                    # Token expired, authenticate with user and password
+                    result = ArqValidations.user_identify(user, pswrd)
+                    return result
+                else:
+                    raise e
+        else:
+            # No token provided, proceed with username and password authentication
+            result = ArqValidations.user_identify(user, pswrd)
+            return result 
+           
+    @staticmethod
+    def validate_token(token):
+        """
+        Validate the token. If it's valid, return the user ID. 
+        Otherwise, raise an exception.
+        
+        Args:
+            token (str): The JWT token to validate.
+
+        Returns:
+            int: The user ID if the token is valid.
+            
+        Raises:
+            ValidationError: If the token is expired or invalid.
+        """
+        try:
+            decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            return decoded.get("user_id")
+        except jwt.ExpiredSignatureError:
+            raise ValidationError("Token has expired")
+        except jwt.InvalidTokenError:
+            raise ValidationError("Invalid token")
+
+    @staticmethod
+    def user_identify(user, pswrd):
+        """
+        Method to identify the user based on username and password by calling the user validation API.
+
+        Args:
+            user (str): The username for authentication.
+            pswrd (str): The password for authentication.
+
+        Returns:
+            dict: JSON containing 'id_user' and 'token' if valid.
+                  Example: { "id_user": 123, "token": "abcde12345" }
+
+        Raises:
+            APIError: If the request fails due to connection issues, timeouts, or bad responses.
+            ValidationError: If 'id_user' or 'token' is missing in the response.
+        """
+        # Get user manager host and port from environment variables
+        user_manager_host = os.getenv('user_manager_host', 'localhost')
+        user_manager_port = os.getenv('user_manager_port', 20070)
+        url = f"http://{user_manager_host}:{user_manager_port}/user_validation"
+
+        # Create Basic Authentication header
+        auth_string = f"{user}:{pswrd}"
+        auth_header = base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
+        headers = {
+            'Authorization': f'Basic {auth_header}'
+        }
+
+        try:
+            # Make a POST request with Basic Authentication headers
+            response = requests.post(url, headers=headers)
+            # Raise exception if the request failed
+            response.raise_for_status()
+            result = response.json()
+            id_user = result.get('id_user', None)
+            token = result.get('token', None)
+            # Check if id_user or token exists
+            if id_user is None or token is None:
+                raise ValidationError("User ID or token not found in the API response")
+            return {
+                "id_user": id_user,
+                "token": token
+            }
+        except requests.exceptions.RequestException as e:
+            log_to_api(None, f"Exception in user_identify: {str(e)}", error=True)
+            raise

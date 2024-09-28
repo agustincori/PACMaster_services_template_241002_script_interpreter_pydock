@@ -126,11 +126,10 @@ def log_and_raise(exception_type, error_message, original_exception=None, contex
 
     # If original_exception exists, raise a new exception with both messages and keep the original exception details
     if original_exception:
-        # Create a new exception that includes both the error_message and the original exception's message
+        # Preserve both error_message and original exception's details
         raise exception_type(f"{error_message}. Original exception: {str(original_exception)}") from original_exception
     else:
         raise exception_type(error_message)
-
 
 def format_error_response(service_name, route_name, exception, id_run=None):
     """
@@ -204,15 +203,26 @@ def handle_exceptions(func, context=None, id_run=None):
     except APIError as e:
         log_and_raise(APIError, f"{context} | {str(e)}", original_exception=e, context=context)
     except HTTPError as e:
-        log_and_raise(HTTPError, f"{context} | {str(e)}", original_exception=e, context=context)
+        log_and_raise(HTTPError, f"{context} | External Service Error: {str(e)}", original_exception=e, context=context)
     except requests.Timeout as e:
-        log_and_raise(APIError, f"{context} | Timeout Error: {str(e)}", original_exception=e, context=context)
+        log_and_raise(APIError, f"{context} | External Service Error: Timeout Error: {str(e)}", original_exception=e, context=context)
     except requests.ConnectionError as e:
-        log_and_raise(ConnectionError, f"{context} | Connection Error: {str(e)}", original_exception=e, context=context)
+        log_and_raise(ConnectionError, f"{context} | External Service Error: Connection Error: {str(e)}", original_exception=e, context=context)
     except requests.HTTPError as e:
-        log_and_raise(HTTPError, f"{context} | External Service Error: {str(e)}", original_exception=e, context=context)       
+        # Now the 'response' attribute should exist and provide the server's response details
+        response = getattr(e, 'response', None)
+        if response is not None:
+            try:
+                error_info = response.json()  # Attempt to load the response JSON
+                server_error_details = error_info.get('error', "No 'error' field in server response.")
+            except ValueError:
+                server_error_details = response.text or "No detailed error message from server."
+            error_message = f"{context} | External Service Error: {str(e)}. Server response: {server_error_details}"
+        else:
+            error_message = f"{context} | External Service Error: {str(e)}"
+        log_and_raise(HTTPError, error_message, original_exception=e, context=context)
     except requests.RequestException as e:
-        log_and_raise(APIError, f"{context} | Request Error: {str(e)}", original_exception=e, context=context)
+        log_and_raise(APIError, f"{context} | External Service Error: Request Error: {str(e)}", original_exception=e, context=context)
     except CustomError as e:
         log_and_raise(type(e), f"{context} | {str(e)}", original_exception=e, context=context)
     except Exception as e:

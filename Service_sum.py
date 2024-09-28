@@ -45,51 +45,42 @@ def sum_and_save_route():
     """
     Handles the /sum_and_save API endpoint.
 
-    This route parses the request data, validates metadata, and delegates the
-    summation logic to the sum_and_save function in Utilities_Main. It also
-    handles exceptions and returns appropriate responses.
-
-    Returns:
-    - JSON: A response containing the result of the summation and, if applicable,
-      metadata such as execution time. If an error occurs, an error message is returned.
-    """
+    This route parses the request data, validates metadata, and logs important information.
+    It delegates the summation logic to the sum_and_save function and returns appropriate responses.
     
+    Returns:
+    - JSON: A response containing the result of the summation and metadata such as execution time.
+      If an error occurs, an error message is returned.
+    """
     
     script_start_time = time.time()
     route_name = 'sum_and_save_route'
     logging.debug(f'Starting {route_name} process.')
-    id_run = None  # Initialize id_run for error handling
-    id_script=0
+    id_script = 0  # Default id_script value
+    id_run = None
     try:
-        # Parse the request data using parse_request_data()
-        input_json = parse_request_data()
+        # Step 1: Parse the request data
+        input_json = request.get_json()
+        input_json.setdefault("id_script", id_script)  # Ensure id_script is set
+        input_json["script_start_time"] = script_start_time
 
-        # Set default id_script if not provided
-        input_json.setdefault("id_script", id_script)
-        input_json.setdefault("script_start_time", script_start_time)
-        # Extract arguments
-        data = {
-            "arg1": input_json.get("arg1"),
-            "arg2": input_json.get("arg2")
-        }
-
-        # Extract and validate metadata using data_validation_metadata_generation
+        
+        # Step 2: Validate metadata
         metadata = data_validation_metadata_generation(input_json)
         id_run = metadata.get("id_run")
         use_db = metadata.get("use_db", True)
-        if use_db and id_run:
-            arq_save_outcome_data(metadata=metadata,id_category=1,id_type=0,v_string="data_validation_metadata_generation executed succesfully",v_integer=execution_time_ms)
-        # Log the start of the operation
+
+        # Step 3: Log the start of the operation
         log_to_api(metadata, log_message=f'{route_name} starts.', use_db=use_db)
 
-        # Perform the summation by calling the sum_and_save function
-        result_data = sum_and_save(data, metadata, use_db=use_db)
+        # Step 4: Perform the summation
+        result_data = sum_and_save(input_json, metadata, use_db=use_db)
 
-        # Calculate execution time
+        # Step 5: Calculate execution time
         execution_time_ms = int((time.time() - script_start_time) * 1000)
         result_data["execution_time_ms"] = execution_time_ms
 
-        # Save execution time if using the database
+        # Step 6: Save execution time and metadata to the database if necessary
         if use_db and id_run:
             arq_save_outcome_data(
                 metadata=metadata,
@@ -98,17 +89,18 @@ def sum_and_save_route():
                 v_integer=execution_time_ms
             )
 
-        # Log the execution time and end of the operation
+        # Step 7: Log the completion and execution time
         log_to_api(metadata, log_message=f"total execution_time_ms={execution_time_ms}", use_db=use_db)
         log_to_api(metadata, log_message=f"{route_name} ends.", use_db=use_db)
 
-        succes_status=200
-        arq_update_run_fields(metadata, status=succes_status)
-        return jsonify(result_data), succes_status
+        # Step 8: Update run fields and return the result
+        success_status = 200
+        arq_update_run_fields(metadata, status=success_status)
+        return jsonify(result_data), success_status
 
     except Exception as e:
         error_response, status_code = format_error_response(
-            service_name=service_data.get('service_name'),
+            service_name="sum_and_save_service",
             route_name=route_name,
             exception=e,
             id_run=id_run

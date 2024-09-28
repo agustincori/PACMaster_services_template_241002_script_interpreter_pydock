@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         /* Inline styles to ensure consistency */
-        textarea, button {
+        textarea, button, input {
             background-color: rgba(128, 0, 128, 0.2); /* Purple with transparency */
             border: 2px solid purple;
             border-radius: 15px;
@@ -50,6 +50,10 @@
         .indent {
             margin-left: 20px;
         }
+
+        .input-field {
+            margin-bottom: 15px;
+        }
     </style>
     <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
 </head>
@@ -64,16 +68,22 @@
     <ul class="indent">
         <li><b class="parameter">arg1:</b> The first number (int or float)</li>
         <li><b class="parameter">arg2:</b> The second number (int or float)</li>
-        <li><b class="parameter">user:</b> The username for identification (string)</li>
-        <li><b class="parameter">password:</b> The password for identification (string)</li>
     </ul>
+
+    <div class="input-field">
+        <label for="username">Username:</label><br>
+        <input type="text" id="username" value="PAC"><br>
+    </div>
+    <div class="input-field">
+        <label for="password">Password:</label><br>
+        <input type="password" id="password" value="pda)cYh(oBo6blBN@4n0e)U6UCOicJYe"><br>
+    </div>
+
     <p><b class="important">Example Payload:</b></p>
     <textarea id="jsonPayload" rows="8" cols="50">
 {
   "arg1": 10,
-  "arg2": 20,
-  "user": "PAC",
-  "password": "pda)cYh(oBo6blBN@4n0e)U6UCOicJYe"
+  "arg2": 20
 }
     </textarea>
     <br>
@@ -94,10 +104,25 @@
             const url = '/sum_and_save';
             const data = document.getElementById('jsonPayload').value;
 
+            // Get username and password from input fields
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            // Check if username and password are provided
+            if (!username || !password) {
+                alert("Please enter both username and password.");
+                return;
+            }
+
+            // Create Basic Authentication token
+            const authHeader = 'Basic ' + btoa(username + ':' + password);
+
+            // Execute POST request with Authorization header
             fetch(url, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': authHeader
                 },
                 body: data
             })
