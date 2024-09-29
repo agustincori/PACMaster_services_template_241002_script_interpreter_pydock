@@ -1,6 +1,6 @@
 # Utilities_Main.py
 import yaml
-from Utilities_Architecture import log_to_api, arq_get_new_id_run, arq_save_outcome_data,arq_user_identify,arq_update_run_fields
+from Utilities_Architecture import log_to_api, arq_get_new_id_run, arq_save_outcome_data,arq_update_run_fields, ArqValidations
 from Utilities_error_handling import log_and_raise, handle_exceptions, APIError,ValidationError
 from flask import request
 import os
@@ -103,7 +103,8 @@ def data_validation_metadata_generation(data):
     metadata = {
         "id_father_run": data.get("id_father_run"),
         "id_father_service": data.get("id_father_service"),
-        "token": data.get("token"),  # Token passed in the request
+        'token_access' : data.get("token_access"),
+        'token_refresh' : data.get("token_refresh"),
         "user": data.get("user"),    # User passed in the request
         "password": data.get("password"),  # Password passed in the request
         "id_script": data.get("id_script"),
@@ -124,59 +125,6 @@ def data_validation_metadata_generation(data):
             return auth_decoded.split(":")
         return None, None
 
-    def validate_token(token):
-        """
-        Validate the token. If it's valid, return the user ID. 
-        Otherwise, raise an exception.
-        """
-        try:
-            decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            return decoded.get("id_user")
-        except jwt.ExpiredSignatureError:
-            raise ValidationError("Token has expired")
-        except jwt.InvalidTokenError:
-            raise ValidationError("Invalid token")
-
-    def generate_new_token(user, password):
-        """
-        Call arq_user_identify to generate a new token if the token validation fails.
-        """
-        if user is None or password is None:
-            log_and_raise(ValidationError, "User and password are required to generate a new token", id_run=metadata.get("id_run"), context="generate_new_token")
-        
-        # Assume arq_user_identify returns an id_user and token or raises an exception
-        user_data = arq_user_identify({"user": user, "password": password})
-        if not user_data or 'token' not in user_data:
-            log_and_raise(ValidationError, "Failed to generate a new token", id_run=metadata.get("id_run"), context="generate_new_token")
-        
-        return user_data['id_user'], user_data['token']
-
-    def validate_token_or_user(metadata):
-        """
-        Validate the token if provided; otherwise, generate a new token.
-        """
-        token = metadata.get("token")
-        user = metadata.get("user")
-        password = metadata.get("password")
-
-        if token:
-            try:
-                # Validate the token if it exists
-                id_user = validate_token(token)
-                metadata["id_user"] = id_user
-                log_to_api(metadata, f"Token validated successfully for user {id_user}")
-            except ValidationError:
-                # If token validation fails, generate a new token
-                log_to_api(metadata, "Token validation failed, attempting to generate a new token")
-                id_user, new_token = generate_new_token(user, password)
-                metadata["id_user"] = id_user
-                metadata["token"] = new_token  # Update metadata with the new token
-        else:
-            # If no token is provided, generate a new token
-            log_to_api(metadata, "No token provided, attempting to generate a new token")
-            id_user, new_token = generate_new_token(user, password)
-            metadata["id_user"] = id_user
-            metadata["token"] = new_token
 
     def create_new_run_id(metadata):
         """
@@ -202,7 +150,7 @@ def data_validation_metadata_generation(data):
         
         if metadata["use_db"]:
              # Validate the token or generate a new one
-            validate_token_or_user(metadata)           
+            metadata=ArqValidations.validate_auth(metadata)           
             # Create a new run ID if necessary
             create_new_run_id(metadata)
 
@@ -213,8 +161,6 @@ def data_validation_metadata_generation(data):
         return metadata
 
     except Exception as e:
-        # log_and_raise will handle logging and raising of exceptions
-        log_to_api(metadata, f"Exception in data_validation_metadata_generation: {str(e)}", error=True)
         raise
 
     

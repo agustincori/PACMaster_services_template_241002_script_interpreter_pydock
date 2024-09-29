@@ -172,57 +172,7 @@ def log_to_api(metadata, log_message, debug=False, warning=False, error=False, u
 
 
 
-def arq_get_new_id_run(metadata):
-    """
-    Generates a new run ID by sending a request to the /create_new_run API endpoint with the script ID,
-    user ID, optional parent run ID, and optional father service ID. The method dynamically determines the table name
-    based on the provided service_name.
 
-    The method logs both the operation's initiation and its outcome (success or failure).
-    If successful, it returns the new run ID; otherwise, it logs the error and returns the error details.
-
-    Args:
-        metadata (dict): A dictionary containing the necessary data to create the run ID, including:
-            - id_script (int): The unique identifier for the script whose run ID is being created.
-            - id_user (int): The unique identifier for the user.
-            - id_father_service (int, optional): The identifier of the father service.
-            - id_father_run (str, optional): The run ID of the parent operation, if applicable.
-            - user (str): The username for authentication.
-            - password (str): The password for authentication.
-
-    Returns:
-        dict: The new run ID if the creation was successful; otherwise, a dictionary with error details.
-
-    Raises:
-        ValueError: If required arguments are not provided.
-    """
-
-    payload = {
-        'service_name': service_name,
-        'id_script': metadata.get('id_script'),
-        'id_user': metadata.get('id_user'),
-        'father_service_id': metadata.get('id_father_service'),
-        'id_run_father': metadata.get('id_father_run'),
-        'user': metadata.get('user'),
-        'password': metadata.get('password')
-    }
-
-    url = f"{BASE_URL}/create_new_run"
-
-    try:
-        # Use arq_handle_api_request to send the API request
-        new_run_response = arq_handle_api_request(url, payload=payload, metadata=metadata,method='POST')
-
-        # Process the response
-        new_run_id = new_run_response.get('id_run')
-        token=new_run_response.get('token')
-        log_to_api(metadata,f"New run ID created: {new_run_id} for script ID: {metadata.get('id_script')} in service {service_name}. Executed in {new_run_response.get('execution_time_ms')} ms.",debug=True)
-        return {'id_run': new_run_id,'token': token}
-
-
-    except Exception as e:
-        log_to_api(metadata, f"Exception in arq_get_new_id_run: {str(e)}", error=True)
-        raise
 
     
 def get_data_type(id_category, id_type, id_run=None):
@@ -320,6 +270,55 @@ def arq_save_outcome_data(metadata, id_category, id_type, v_integer=None, v_floa
         log_to_api(metadata, f"Exception in arq_user_identify: {str(e)}", error=True)
         raise
 
+def arq_get_new_id_run(metadata):
+    """
+    Generates a new run ID by sending a request to the /create_new_run API endpoint with the script ID,
+    user ID, optional parent run ID, and optional father service ID. The method dynamically determines the table name
+    based on the provided service_name.
+
+    The method logs both the operation's initiation and its outcome (success or failure).
+    If successful, it returns the new run ID; otherwise, it logs the error and returns the error details.
+
+    Args:
+        metadata (dict): A dictionary containing the necessary data to create the run ID, including:
+            - id_script (int): The unique identifier for the script whose run ID is being created.
+            - id_user (int): The unique identifier for the user.
+            - id_father_service (int, optional): The identifier of the father service.
+            - id_father_run (str, optional): The run ID of the parent operation, if applicable.
+            - user (str): The username for authentication.
+            - password (str): The password for authentication.
+
+    Returns:
+        dict: The new run ID if the creation was successful; otherwise, a dictionary with error details.
+
+    Raises:
+        ValueError: If required arguments are not provided.
+    """
+
+    payload = {
+        'service_name': service_name,
+        'id_script': metadata.get('id_script'),
+        'id_user': metadata.get('id_user'),
+        'father_service_id': metadata.get('id_father_service'),
+        'id_run_father': metadata.get('id_father_run'),
+    }
+
+    url = f"{BASE_URL}/create_new_run"
+
+    try:
+        # Use arq_handle_api_request to send the API request
+        new_run_response = arq_handle_api_request(url, payload=payload, metadata=metadata,method='POST')
+
+        # Process the response
+        new_run_id = new_run_response.get('id_run')
+        token=new_run_response.get('token')
+        log_to_api(metadata,f"New run ID created: {new_run_id} for script ID: {metadata.get('id_script')} in service {service_name}. Executed in {new_run_response.get('execution_time_ms')} ms.",debug=True)
+        return {'id_run': new_run_id,'token': token}
+
+
+    except Exception as e:
+        log_to_api(metadata, f"Exception in arq_get_new_id_run: {str(e)}", error=True)
+        raise
 
 def arq_update_run_fields(metadata, status=None, milestone_msg=None, id_user=None):
     """
@@ -441,70 +440,16 @@ def arq_get_run(metadata):
         log_to_api(metadata, f"Exception in arq_get_run: {str(e)}", error=True)
         raise
 
-def arq_user_identify(metadata):
+
+def arq_handle_api_request(url, payload=None, metadata=None, method='POST'):
     """
-    Identifies the user by calling the user validation API and updates the run status accordingly.
-
-    Args:
-        metadata (dict): A dictionary containing necessary information including:
-            - user (str): The username for authentication.
-            - password (str): The password for authentication.
-            - id_run (int): The run ID for logging and updating the run.
-
-    Returns:
-        int: User ID if valid.
-
-    Raises:
-        ValidationError: If the request fails or the user is invalid.
-    """
-    # Get user manager host and port from environment variables
-    user_manager_host = os.getenv("user_manager_host", "localhost")
-    user_manager_port = os.getenv("user_manager_port", "20070")
-    url = f"http://{user_manager_host}:{user_manager_port}/user_validation"
-
-    payload = {
-        "user": metadata.get("user"),
-        "pswrd": metadata.get("password"),
-    }
-
-    id_run = metadata.get("id_run")
-
-    # Call the user validation API
-    try:
-        result = arq_handle_api_request(url, payload=payload, metadata=metadata,method='POST')
-        id_user = result.get("id_user")
-
-        # Check if user_id exists
-        if id_user is None:
-            log_and_raise(
-                ValidationError,
-                "User ID not found in the API response",
-                id_run=id_run,
-                context="arq_user_identify",
-            )
-
-        # Update metadata with the user_id
-        metadata["id_user"] = id_user
-        log_to_api(metadata, f"User identified successfully: id_user={id_user}. Executed in {result.get('execution_time_ms')} ms.", debug=True, use_db=True)
-
-        return id_user
-
-    except Exception as e:
-        # Log the exception using log_to_api before re-raising it
-        log_to_api(metadata, f"Exception in arq_user_identify: {str(e)}", error=True)
-        raise
-
-
-
-def arq_handle_api_request(url, payload=None, metadata=None,method='POST'):
-    """
-    Sends an API request with error handling and logging.
+    Sends an API request with error handling, token authentication, or Basic Authentication (user/password).
 
     Args:
         url (str): The URL of the API endpoint to which the request is sent.
         payload (dict, optional): The data to be sent in the request body (for POST) or as query parameters (for GET). Defaults to None.
+        metadata (dict, optional): Contains 'token' for token authentication, or 'user' and 'password' for Basic Authentication. Defaults to None.
         method (str): The HTTP method to use for the request ('POST' or 'GET'). Defaults to 'POST'.
-        id_run (int, optional): The ID of the associated run for logging purposes. Defaults to None.
 
     Returns:
         dict: The parsed JSON response from the API if the request is successful.
@@ -513,16 +458,29 @@ def arq_handle_api_request(url, payload=None, metadata=None,method='POST'):
         APIError: If the response status code is not 200 or if a network error occurs.
     """
 
+    headers = {}
+
+    # Check for token in metadata and add it to payload
+    if 'token_access' in metadata and metadata['token_access'] is not None and 'token_refresh' in metadata and metadata['token_refresh'] is not None:
+        if not payload:
+            payload = {}
+        payload['token_access'] = metadata['token_access']
+        payload['token_refresh'] = metadata['token_refresh']
+    # Check for Basic Authentication (user and password) in metadata and add it to headers
+    elif metadata and 'user' in metadata and metadata['user'] is not None and 'password' in metadata and  metadata['password'] is not None:
+        auth_string = f"{metadata['user']}:{metadata['password']}"
+        auth_header = base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
+        headers['Authorization'] = f'Basic {auth_header}'
+
     def request_func():
         if method.upper() == 'POST':
-            response = requests.post(url, json=payload)
+            response = requests.post(url, json=payload, headers=headers)
         elif method.upper() == 'GET':
-            response = requests.get(url, params=payload)
+            response = requests.get(url, params=payload, headers=headers)
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
 
-        # If the response status code indicates an error, raise an HTTPError, 
-        # but capture the detailed response for further use
+        # If the response status code indicates an error, raise an HTTPError
         response.raise_for_status()
         return response
 
@@ -532,8 +490,6 @@ def arq_handle_api_request(url, payload=None, metadata=None,method='POST'):
         return response.json()
 
     except Exception as e:
-        # Log the exception using log_to_api before re-raising it
-        log_to_api(metadata, f"Exception in arq_handle_api_request: {str(e)}", error=True)
         raise
 
 
@@ -542,41 +498,54 @@ def arq_handle_api_request(url, payload=None, metadata=None,method='POST'):
 
 class ArqValidations:
     @staticmethod
-    def validate_auth(data):
+    def validate_auth(metadata):
         """
         Validates the user based on provided credentials or token.
         
         Args:
-            data (dict): A dictionary containing 'user', 'password', and 'token'.
+            metadata (dict): A dictionary containing 'user', 'password', 'token_access', and 'token_refresh'.
         
         Returns:
-            dict: A dictionary containing 'id_user' and 'token' if valid.
-                  Example: { "id_user": 123, "token": "abcde12345" }
+            dict: Updated metadata with 'id_user' if valid.
+                  Example: { "user": "example", "password": "password", "token_access": "abcde12345", "id_user": 123 }
                   
         Raises:
             ValidationError: If credentials or token are invalid.
         """
-        user = data.get("user", None)
-        pswrd = data.get("password", None)
-        token = data.get("token", None)
+        token_access = metadata.get('token_access')
+        token_refresh = metadata.get('token_refresh')
 
-        if token:
+        if token_access:
             try:
                 # Validate the token
-                id_user = ArqValidations.validate_token(token)
-                return {"id_user": id_user, "token": token}
+                id_user = ArqValidations.validate_token(token_access)
+                
+                # Update metadata with id_user and return
+                metadata['id_user'] = id_user
+                return metadata
             except ValidationError as e:
                 # If token is expired or invalid, fall back to user identification
                 if "expired" in str(e):
-                    # Token expired, authenticate with user and password
-                    result = ArqValidations.user_identify(user, pswrd)
-                    return result
+                    try:
+                        # Attempt to refresh the token using the refresh_token method
+                        metadata = ArqValidations.refresh_token(metadata)
+                        
+                        # Validate the refreshed token
+                        id_user = ArqValidations.validate_token(metadata['token_access'])
+                        metadata['id_user'] = id_user
+                        return metadata
+                    except ValidationError as refresh_error:
+                        # If token refresh fails, fall back to user identification
+                        result = ArqValidations.user_identify(metadata)
+                        metadata.update(result)
+                        return metadata
                 else:
                     raise e
         else:
             # No token provided, proceed with username and password authentication
-            result = ArqValidations.user_identify(user, pswrd)
-            return result 
+            result = ArqValidations.user_identify(metadata)
+            metadata.update(result)
+            return metadata
            
     @staticmethod
     def validate_token(token):
@@ -599,21 +568,58 @@ class ArqValidations:
         except jwt.ExpiredSignatureError:
             raise ValidationError("Token has expired")
         except jwt.InvalidTokenError:
+        
             raise ValidationError("Invalid token")
+        
+    @staticmethod
+    def refresh_token(metadata):
+        """
+        Refreshes the access token using the refresh token.
+        
+        Args:
+            metadata (dict): A dictionary containing 'token_access' and 'token_refresh'.
+        
+        Returns:
+            dict: Updated metadata with a new 'token_access' and the same 'token_refresh'.
+            
+        Raises:
+            ValidationError: If the refresh token is invalid or expired.
+        """
+        # Get user manager host and port from environment variables
+        user_manager_host = os.getenv('user_manager_host', 'localhost')
+        user_manager_port = os.getenv('user_manager_port', 20070)
+        url = f"http://{user_manager_host}:{user_manager_port}/refresh_token"
+
+        try:
+            # Call the refresh_token API using the refresh token
+            response_data = arq_handle_api_request(url, metadata=metadata, method='POST')
+
+            # Extract new access token from the response
+            token_access = response_data.get('token_access', None)
+            token_refresh = response_data.get('token_refresh', None)
+
+            # Ensure we have both tokens in the response
+            if token_access is None or token_refresh is None:
+                raise ValidationError("Token refresh failed: Missing tokens in the API response")
+
+            # Update metadata with new token_access and return
+            metadata['token_access'] = token_access
+            metadata['token_refresh'] = token_refresh
+            return metadata
+
+        except Exception as e:
+            raise ValidationError(f"Error refreshing token: {str(e)}")
 
     @staticmethod
-    def user_identify(user, pswrd):
+    def user_identify(metadata):
         """
         Method to identify the user based on username and password by calling the user validation API.
-
         Args:
             user (str): The username for authentication.
             pswrd (str): The password for authentication.
-
         Returns:
-            dict: JSON containing 'id_user' and 'token' if valid.
-                  Example: { "id_user": 123, "token": "abcde12345" }
-
+            dict: The updated metadata with 'id_user', 'token_acces', and 'token_refresh' if valid.
+                  Example: { "id_user": 123, "token_acces": "abcde12345", "token_refresh": "refresh_token_value" }
         Raises:
             APIError: If the request fails due to connection issues, timeouts, or bad responses.
             ValidationError: If 'id_user' or 'token' is missing in the response.
@@ -621,30 +627,25 @@ class ArqValidations:
         # Get user manager host and port from environment variables
         user_manager_host = os.getenv('user_manager_host', 'localhost')
         user_manager_port = os.getenv('user_manager_port', 20070)
-        url = f"http://{user_manager_host}:{user_manager_port}/user_validation"
-
-        # Create Basic Authentication header
-        auth_string = f"{user}:{pswrd}"
-        auth_header = base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
-        headers = {
-            'Authorization': f'Basic {auth_header}'
-        }
+        url = f"http://{user_manager_host}:{user_manager_port}/get_token"
 
         try:
-            # Make a POST request with Basic Authentication headers
-            response = requests.post(url, headers=headers)
-            # Raise exception if the request failed
-            response.raise_for_status()
-            result = response.json()
-            id_user = result.get('id_user', None)
-            token = result.get('token', None)
-            # Check if id_user or token exists
-            if id_user is None or token is None:
+            # Call arq_handle_api_request with POST method and metadata for Basic Auth
+            response_data = arq_handle_api_request(url, metadata=metadata, method='POST')
+
+            # Extract id_user and token from the response
+            id_user = response_data.get('id_user', None)
+            token_access = response_data.get('token_access', None)
+            token_refresh = response_data.get('token_refresh', None)
+            # Check if id_user or token exists in the response
+            if id_user is None or token_access is None or token_refresh is None:
                 raise ValidationError("User ID or token not found in the API response")
-            return {
-                "id_user": id_user,
-                "token": token
-            }
-        except requests.exceptions.RequestException as e:
-            log_to_api(None, f"Exception in user_identify: {str(e)}", error=True)
+            
+            # Add id_user, token_acces, and token_refresh to metadata
+            metadata['id_user'] = id_user
+            metadata['token_access'] = token_access
+            metadata['token_refresh'] = token_refresh
+            return metadata
+
+        except Exception as e:
             raise
