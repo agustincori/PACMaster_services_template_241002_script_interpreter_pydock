@@ -33,7 +33,7 @@ import logging
 from flask import Flask, request, jsonify, render_template
 from waitress import serve
 from Utilities_Main import sum_and_save, data_validation_metadata_generation,parse_request_data
-from Utilities_Architecture import log_to_api, arq_save_outcome_data,arq_update_run_fields,service_data
+from Utilities_Architecture import log_to_api, arq_save_outcome_data,ArqRuns,service_data
 from Utilities_error_handling import log_and_raise, format_error_response, ValidationError, HTTPError, APIError
 
 logging.basicConfig(level=logging.DEBUG)  # Configures logging to display all debug messages
@@ -95,7 +95,7 @@ def sum_and_save_route():
 
         # Step 8: Update run fields and return the result
         success_status = 200
-        arq_update_run_fields(metadata, status=success_status)
+        ArqRuns.update_run_fields(metadata, status=success_status)
         return jsonify(result_data), success_status
 
     except Exception as e:

@@ -1,10 +1,9 @@
 # Utilities_Main.py
 import yaml
-from Utilities_Architecture import log_to_api, arq_get_new_id_run, arq_save_outcome_data,arq_update_run_fields, ArqValidations
-from Utilities_error_handling import log_and_raise, handle_exceptions, APIError,ValidationError
+from Utilities_Architecture import log_to_api, arq_save_outcome_data, ArqValidations,ArqRuns
+from Utilities_error_handling import log_and_raise, ValidationError
 from flask import request
 import os
-import jwt
 import base64
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'th3_s3cr3t_k3y')
@@ -137,11 +136,10 @@ def data_validation_metadata_generation(data):
         if metadata["id_script"] is None:
             log_and_raise(ValidationError, "id_script is required and cannot be None", id_run=metadata.get("id_run"), context="create_new_run_id")
 
-        new_run_id_response = arq_get_new_id_run(metadata)
+        new_run_id_response = ArqRuns.get_new_id_run(metadata)
 
         # Update metadata with new run ID
         metadata["id_run"] = new_run_id_response.get('id_run')
-        metadata["token"] = new_run_id_response.get('token')
 
     try:
         # Step 1: Ensure the user and password are available before creating the run
@@ -155,7 +153,7 @@ def data_validation_metadata_generation(data):
             create_new_run_id(metadata)
 
         # If everything is successful, update the run with the user_id and status
-        arq_update_run_fields(metadata, milestone_msg='data_validation_metadata_generation done', id_user=metadata["id_user"])
+        ArqRuns.update_run_fields(metadata, milestone_msg='data_validation_metadata_generation done')
 
         # Return the updated metadata
         return metadata

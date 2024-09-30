@@ -93,7 +93,8 @@ import requests
 import os
 from datetime import datetime
 import time
-from Utilities_error_handling import log_and_raise,handle_exceptions,APIError,HTTPError,ValidationError
+from Utilities_error_handling import handle_exceptions,ValidationError
+import Utilities_data_type
 import base64
 import jwt
 
@@ -152,8 +153,6 @@ def log_to_api(metadata, log_message, debug=False, warning=False, error=False, u
         'service_name': service_name,
         'id_run': id_run,
         'log': log_message_with_timestamp,
-        'user': user,
-        'password': password,
         'debug': debug,
         'warning': warning,
         'error': error
@@ -245,9 +244,7 @@ def arq_save_outcome_data(metadata, id_category, id_type, v_integer=None, v_floa
         'v_timestamp': v_timestamp,
         'v_jsonb': v_jsonb,  # Add jsonb field
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # Use current time
-        'service_name': service_data.get('service_name'),
-        'user' : metadata.get('user'),
-        'password' : metadata.get('password')        
+        'service_name': service_data.get('service_name')  
     }
 
     # Filter out None values so they default to NULL in the database
@@ -270,175 +267,170 @@ def arq_save_outcome_data(metadata, id_category, id_type, v_integer=None, v_floa
         log_to_api(metadata, f"Exception in arq_user_identify: {str(e)}", error=True)
         raise
 
-def arq_get_new_id_run(metadata):
-    """
-    Generates a new run ID by sending a request to the /create_new_run API endpoint with the script ID,
-    user ID, optional parent run ID, and optional father service ID. The method dynamically determines the table name
-    based on the provided service_name.
+class ArqRuns:
+    @staticmethod
+    def get_new_id_run(metadata):
+        """
+        Generates a new run ID by sending a request to the /create_new_run API endpoint with the script ID,
+        user ID, optional parent run ID, and optional father service ID. The method dynamically determines the table name
+        based on the provided service_name.
 
-    The method logs both the operation's initiation and its outcome (success or failure).
-    If successful, it returns the new run ID; otherwise, it logs the error and returns the error details.
+        The method logs both the operation's initiation and its outcome (success or failure).
+        If successful, it returns the new run ID; otherwise, it logs the error and returns the error details.
 
-    Args:
-        metadata (dict): A dictionary containing the necessary data to create the run ID, including:
-            - id_script (int): The unique identifier for the script whose run ID is being created.
-            - id_user (int): The unique identifier for the user.
-            - id_father_service (int, optional): The identifier of the father service.
-            - id_father_run (str, optional): The run ID of the parent operation, if applicable.
-            - user (str): The username for authentication.
-            - password (str): The password for authentication.
+        Args:
+            metadata (dict): A dictionary containing the necessary data to create the run ID, including:
+                - id_script (int): The unique identifier for the script whose run ID is being created.
+                - id_user (int): The unique identifier for the user.
+                - id_father_service (int, optional): The identifier of the father service.
+                - id_father_run (str, optional): The run ID of the parent operation, if applicable.
+                - user (str): The username for authentication.
+                - password (str): The password for authentication.
 
-    Returns:
-        dict: The new run ID if the creation was successful; otherwise, a dictionary with error details.
+        Returns:
+            dict: The new run ID if the creation was successful; otherwise, a dictionary with error details.
 
-    Raises:
-        ValueError: If required arguments are not provided.
-    """
+        Raises:
+            ValueError: If required arguments are not provided.
+        """
 
-    payload = {
-        'service_name': service_name,
-        'id_script': metadata.get('id_script'),
-        'id_user': metadata.get('id_user'),
-        'father_service_id': metadata.get('id_father_service'),
-        'id_run_father': metadata.get('id_father_run'),
-    }
-
-    url = f"{BASE_URL}/create_new_run"
-
-    try:
-        # Use arq_handle_api_request to send the API request
-        new_run_response = arq_handle_api_request(url, payload=payload, metadata=metadata,method='POST')
-
-        # Process the response
-        new_run_id = new_run_response.get('id_run')
-        token=new_run_response.get('token')
-        log_to_api(metadata,f"New run ID created: {new_run_id} for script ID: {metadata.get('id_script')} in service {service_name}. Executed in {new_run_response.get('execution_time_ms')} ms.",debug=True)
-        return {'id_run': new_run_id,'token': token}
-
-
-    except Exception as e:
-        log_to_api(metadata, f"Exception in arq_get_new_id_run: {str(e)}", error=True)
-        raise
-
-def arq_update_run_fields(metadata, status=None, milestone_msg=None, id_user=None):
-    """
-    Updates the run status and optionally user information by making a POST request to the /update_run_status endpoint.
-
-    Args:
-        metadata (dict): A dictionary containing the necessary data to update the run, including:
-            - id_run (int): The run ID to update.
-            - user (str): Username for authentication.
-            - password (str): Password for authentication.
-            - script_start_time (float): Start time of the script.
-        status (int, optional): The new status value to set. If None, the current status will be fetched and incremented by 1.
-        milestone_msg (str, optional): A custom milestone message to log. Defaults to None.
-        id_user (int, optional): The user ID to update. Defaults to None.
-
-    Returns:
-        dict: The response from the API.
-
-    Raises:
-        Exception: If the API call fails.
-    """
-    try:
-        # If status is None, fetch the current run data and increment the status by 1
-        if status is None:
-            run_details = arq_get_run(metadata)  # Fetch the current run details
-            current_status = run_details.get('status')
-            
-            if current_status is None:
-                raise ValueError(f"Run with id_run {metadata.get('id_run')} does not have a valid 'status'.")
-            
-            # Increment the status by 1
-            status = current_status + 1
-
-        # Build the payload for updating the run
         payload = {
-            'id_run': metadata.get('id_run'),
-            'service_name': service_data.get('service_name'),  # Assuming service_name is in metadata
-            'user': metadata.get('user'),
-            'password': metadata.get('password'),
-            'token': metadata.get('token'),
-            'status': status
+            'service_name': service_name,
+            'id_script': metadata.get('id_script'),
+            'id_user': metadata.get('id_user'),
+            'father_service_id': metadata.get('id_father_service'),
+            'id_run_father': metadata.get('id_father_run'),
         }
 
-        if id_user is not None:
-            payload['id_user'] = id_user
+        url = f"{BASE_URL}/create_new_run"
 
-        # Construct the URL for the update request
-        url = f"{BASE_URL}/update_run_status"
+        try:
+            # Use arq_handle_api_request to send the API request
+            new_run_response = arq_handle_api_request(url, payload=payload, metadata=metadata, method='POST')
 
-        # Send the POST request to update the run status
-        response = arq_handle_api_request(url, payload=payload, method='POST')
+            # Process the response
+            new_run_id = new_run_response.get('id_run')
+            log_to_api(metadata, f"New run ID created: {new_run_id} for script ID: {metadata.get('id_script')} in service {service_name}. Executed in {new_run_response.get('execution_time_ms')} ms.", debug=True)
+            return {'id_run': new_run_id}
 
-        # Calculate the time taken to execute the script
-        executed_time_ms = int((time.time() - metadata.get("script_start_time")) * 1000)
+        except Exception as e:
+            log_to_api(metadata, f"Exception in get_new_id_run: {str(e)}", error=True)
+            raise
 
-        # Log the update operation
-        if milestone_msg is None:
-            milestone_msg = "This status update has been"
-            debug = True
-        else:
-            debug = False
+    @staticmethod
+    def update_run_fields(metadata, status=None, milestone_msg=None):
+        """
+        Updates the run status and optionally user information by making a POST request to the /update_run_status endpoint.
 
-        log_to_api(metadata, f"Run status has been updated to: {status}", debug=True)
-        log_to_api(metadata, f"{milestone_msg} executed in {executed_time_ms}ms since script started.", debug=debug)
+        Args:
+            metadata (dict): A dictionary containing the necessary data to update the run, including:
+                - id_run (int): The run ID to update.
+                - user (str): Username for authentication.
+                - password (str): Password for authentication.
+                - script_start_time (float): Start time of the script.
+            status (int, optional): The new status value to set. If None, the current status will be fetched and incremented by 1.
+            milestone_msg (str, optional): A custom milestone message to log. Defaults to None.
+            id_user (int, optional): The user ID to update. Defaults to None.
 
-        # Save the outcome data (if needed)
-        arq_save_outcome_data(metadata=metadata, id_category=1, id_type=0, v_string=f"status={status}", v_integer=executed_time_ms)
+        Returns:
+            dict: The response from the API.
 
-        # Return the response from the update request
-        return response
+        Raises:
+            Exception: If the API call fails.
+        """
+        try:
+            # If status is None, fetch the current run data and increment the status by 1
+            if status is None:
+                run_details = ArqRuns.get_run(metadata)  # Fetch the current run details
+                current_status = run_details.get('status')
 
-    except Exception as e:
-        log_to_api(metadata, f"Exception in arq_update_run_fields: {str(e)}", error=True)
-        raise
+                if current_status is None:
+                    raise ValueError(f"Run with id_run {metadata.get('id_run')} does not have a valid 'status'.")
 
-def arq_get_run(metadata):
-    """
-    Retrieves run information for the specified run ID by making a GET request to the /get_run/<service_name>/<id_run> endpoint.
+                # Increment the status by 1
+                status = current_status + 1
 
-    Args:
-        metadata (dict): A dictionary containing the necessary data to retrieve the run, including:
-            - id_run (int): The run ID to retrieve.
-            - service_name (str): The name of the service for the run.
-            - user (str): Username for authentication.
-            - password (str): Password for authentication.
+            # Build the payload for updating the run
+            payload = {
+                'id_run': metadata.get('id_run'),
+                'service_name': service_data.get('service_name'),  # Assuming service_name is in metadata
+                'status': status
+            }
 
-    Returns:
-        dict: The run details returned from the API.
+            if metadata['id_user'] is not None:
+                payload['id_user'] = metadata['id_user']
 
-    Raises:
-        Exception: If the API call fails.
-    """
-    try:
-        # Extract necessary information from metadata
-        service_name = service_data.get('service_name')
-        id_run = metadata.get('id_run')
-        
-        if not service_name or not id_run:
-            raise ValueError("Both 'service_name' and 'id_run' must be provided in metadata.")
+            # Construct the URL for the update request
+            url = f"{BASE_URL}/update_run_status"
 
-        # Construct the URL for the API call
-        url = f"{BASE_URL}/get_run/{service_name}/{id_run}"
+            # Send the POST request to update the run status
+            response = arq_handle_api_request(url, payload=payload,metadata=metadata, method='POST')
 
-        # Optionally, you can add authentication headers or parameters
-        auth = (metadata.get('user'), metadata.get('password'))
+            # Calculate the time taken to execute the script
+            executed_time_ms = int((time.time() - metadata.get("script_start_time")) * 1000)
 
-        # Make the GET request to retrieve the run details
-        response = requests.get(url, auth=auth)
+            # Log the update operation
+            if milestone_msg is None:
+                milestone_msg = "This status update has been"
+                debug = True
+            else:
+                debug = False
 
-        # Check if the request was successful
-        if response.status_code == 200:
-            # Return the run details as a JSON dictionary
-            return response.json()
-        else:
-            log_to_api(metadata, f"Failed to retrieve run with id_run {id_run}. Status code: {response.status_code}", error=True)
-            response.raise_for_status()
+            log_to_api(metadata, f"Run status has been updated to: {status}", debug=True)
+            log_to_api(metadata, f"{milestone_msg} executed in {executed_time_ms}ms since script started.", debug=debug)
 
-    except Exception as e:
-        log_to_api(metadata, f"Exception in arq_get_run: {str(e)}", error=True)
-        raise
+            # Save the outcome data (if needed)
+            arq_save_outcome_data(metadata=metadata, id_category=1, id_type=0, v_string=f"status={status}, {milestone_msg}", v_integer=executed_time_ms)
+
+            # Return the response from the update request
+            return response
+
+        except Exception as e:
+            log_to_api(metadata, f"Exception in update_run_fields: {str(e)}", error=True)
+            raise
+
+    @staticmethod
+    def get_run(metadata):
+        """
+        Retrieves run information for the specified run ID by making a POST request to the /get_run endpoint.
+
+        Args:
+            metadata (dict): A dictionary containing the necessary data to retrieve the run, including:
+                - id_run (int): The run ID to retrieve.
+                - service_name (str): The name of the service for the run.
+                - user (str): Username for authentication.
+                - password (str): Password for authentication.
+
+        Returns:
+            dict: The run details returned from the API.
+
+        Raises:
+            Exception: If the API call fails.
+        """
+        try:
+            # Extract necessary information from metadata
+            service_name = service_data.get('service_name')
+            id_run = metadata.get('id_run')
+
+            if not service_name or not id_run:
+                raise ValueError("Both 'service_name' and 'id_run' must be provided in metadata.")
+
+            payload = {
+                'service_name': service_name,
+                'id_run': id_run
+            }
+
+            # Construct the URL for the API call
+            url = f"{BASE_URL}/get_run"
+
+            # Send the payload as a POST request to the API
+            run_details = arq_handle_api_request(url, payload=payload, metadata=metadata, method='POST')
+
+            return run_details
+
+        except Exception as e:
+            log_to_api(metadata, f"Exception in get_run: {str(e)}", error=True)
+            raise
 
 
 def arq_handle_api_request(url, payload=None, metadata=None, method='POST'):
