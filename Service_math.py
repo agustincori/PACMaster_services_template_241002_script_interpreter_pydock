@@ -32,7 +32,7 @@ import os
 import logging
 from flask import Flask, request, jsonify, render_template
 from waitress import serve
-from Utilities_Main import sum_and_save, data_validation_metadata_generation,parse_request_data
+from Utilities_Main import compute_and_save, data_validation_metadata_generation,parse_request_data
 from Utilities_Architecture import log_to_api, arq_save_outcome_data,ArqRuns,service_data
 from Utilities_error_handling import log_and_raise, format_error_response, ValidationError, HTTPError, APIError
 
@@ -40,7 +40,7 @@ logging.basicConfig(level=logging.DEBUG)  # Configures logging to display all de
 
 app = Flask(__name__)
 
-@app.route("/sum_and_save", methods=["POST"])
+@app.route("/arithmetic_operation", methods=["POST"])
 def sum_and_save_route():
     """
     Handles the /sum_and_save API endpoint.
@@ -54,7 +54,7 @@ def sum_and_save_route():
     """
     
     script_start_time = time.time()
-    route_name = 'sum_and_save_route'
+    route_name = 'arithmetic_operation'
     logging.debug(f'Starting {route_name} process.')
     id_script = 0  # Default id_script value
     id_run = None
@@ -74,7 +74,7 @@ def sum_and_save_route():
         log_to_api(metadata, log_message=f'{route_name} starts.', use_db=use_db)
 
         # Step 4: Perform the summation
-        result_data = sum_and_save(input_json, metadata, use_db=use_db)
+        result_data = compute_and_save(input_json, metadata, use_db=use_db)
 
         # Step 5: Calculate execution time
         execution_time_ms = int((time.time() - script_start_time) * 1000)
@@ -100,11 +100,13 @@ def sum_and_save_route():
 
     except Exception as e:
         error_response, status_code = format_error_response(
-            service_name="sum_and_save_service",
+            service_name="math_service",
             route_name=route_name,
             exception=e,
             id_run=id_run
         )
+        if id_run is not None:
+            ArqRuns.update_run_fields(metadata, status=status_code,milestone_msg=error_response)
         return jsonify(error_response), status_code
 
 

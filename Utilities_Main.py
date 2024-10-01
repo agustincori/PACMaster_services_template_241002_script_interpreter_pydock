@@ -8,21 +8,21 @@ import base64
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'th3_s3cr3t_k3y')
 
-def sum_and_save(data, metadata, use_db=True):
+def compute_and_save(data, metadata, use_db=True):
     """
-    Computes the sum of two numbers and saves the arguments and the result.
+    Computes the result of a specified mathematical operation on two numbers and saves the arguments and the result.
 
     Parameters:
-    - data (dict): A dictionary containing the arguments. Should contain 'arg1' and 'arg2'.
+    - data (dict): A dictionary containing the arguments. Should contain 'arg1', 'arg2', and 'operation'.
     - metadata (dict): A dictionary containing metadata, including 'id_run'.
-    - use_db (bool): Whether to use database connection for logging and saving outcome data. Defaults to True.
+    - use_db (bool): Whether to use a database connection for logging and saving outcome data. Defaults to True.
 
     Returns:
-    - dict: A dictionary containing the arguments and the result of the summation.
+    - dict: A dictionary containing the arguments and the result of the computation.
 
     Raises:
-    - ValidationError: If arg1 or arg2 are missing or not numbers.
-    - Exception: For any other exceptions during the summation.
+    - ValidationError: If 'arg1', 'arg2', or 'operation' are missing, or if the operation is invalid.
+    - Exception: For any other exceptions during the computation.
     """
     id_run = metadata.get('id_run')
 
@@ -30,14 +30,15 @@ def sum_and_save(data, metadata, use_db=True):
         # Extract arguments
         arg1 = data.get('arg1')
         arg2 = data.get('arg2')
+        operation = data.get('operation')
 
-        # Check if arg1 and arg2 are provided
-        if arg1 is None or arg2 is None:
+        # Check if arg1, arg2, and operation are provided
+        if arg1 is None or arg2 is None or operation is None:
             log_and_raise(
                 ValidationError,
-                "arg1 and arg2 are required in data dictionary",
+                "arg1, arg2, and operation are required in data dictionary",
                 id_run=id_run,
-                context="sum_and_save"
+                context="compute_and_save"
             )
 
         # Attempt to convert arg1 and arg2 to numbers
@@ -49,30 +50,67 @@ def sum_and_save(data, metadata, use_db=True):
                 ValidationError,
                 f"arg1 and arg2 must be numbers. Error: {ve}",
                 id_run=id_run,
-                context="sum_and_save"
+                context="compute_and_save"
             )
 
-        # Perform the summation
-        result = arg1 + arg2
+        # Perform the specified operation
+        if operation == "sum":
+            result = arg1 + arg2
+        elif operation == "diff":
+            result = arg1 - arg2
+        elif operation == "mult":
+            result = arg1 * arg2
+        elif operation == "div":
+            if arg2 == 0:
+                log_and_raise(
+                    ValidationError,
+                    "Division by zero is not allowed",
+                    id_run=id_run,
+                    context="compute_and_save"
+                )
+            result = arg1 / arg2
+        elif operation == "pwr":
+            result = arg1 ** arg2
+        elif operation == "root":
+            if arg1 < 0 and arg2 % 2 == 0:
+                log_and_raise(
+                    ValidationError,
+                    "Even roots of negative numbers are not allowed",
+                    id_run=id_run,
+                    context="compute_and_save"
+                )
+            result = arg1 ** (1 / arg2)
+        else:
+            log_and_raise(
+                ValidationError,
+                f"Invalid operation '{operation}' specified",
+                id_run=id_run,
+                context="compute_and_save"
+            )
 
-        outcome_data = {"arg1": arg1, "arg2": arg2, "sum": result}
-
-        if use_db and id_run is not None:
-            log_to_api(metadata, log_message=f"Arguments: arg1 = {arg1}, arg2 = {arg2}, sum = {result}", use_db=use_db)
+        input_data = {"arg1": arg1, "arg2": arg2, "operation": operation} 
+        # Save or log outcome data if necessary
+        if use_db:
+            log_to_api(metadata, log_message=f"Arguments: arg1 = {arg1}, arg2 = {arg2}, operation = {operation}, result = {result}", use_db=use_db)
             arq_save_outcome_data(
                 metadata=metadata,
-                id_category=1,
+                id_category=0,
                 id_type=0,
-                v_jsonb=outcome_data
+                v_jsonb=input_data
             )
-            log_to_api(metadata, log_message="Outcome data saved successfully.", use_db=use_db)
+            arq_save_outcome_data(
+                metadata=metadata,
+                id_category=0,
+                id_type=1,
+                v_float=result
+            )
+            log_to_api(metadata, log_message="Income & outcome data saved successfully.", use_db=use_db)
         else:
-            print("Outcome data:", outcome_data)
+            print("Income data:", input_data)
 
         # Return the result data
         return {
-            "result": result,
-            "id_run": id_run
+            "result": result
         }
 
     except Exception as e:
@@ -84,7 +122,7 @@ def sum_and_save(data, metadata, use_db=True):
             type(e),
             error_message,
             id_run=id_run,
-            context="sum_and_save"
+            context="compute_and_save"
         )
 
 def data_validation_metadata_generation(data):

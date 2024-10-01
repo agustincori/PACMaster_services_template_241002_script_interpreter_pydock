@@ -62,7 +62,7 @@
     <h1>Service Math</h1>
     <h2>Available Routes:</h2>
 
-    <h3>1. POST /sum_and_save</h3>
+    <h3>1. POST /arithmetic_operation</h3>
     <p><b class="parameter">Description:</b> This route computes the sum of two numbers and saves the arguments and the result.</p>
     <p><b class="important">Parameters:</b></p>
     <ul class="indent">
@@ -83,7 +83,8 @@
     <textarea id="jsonPayload" rows="8" cols="50">
 {
   "arg1": 10,
-  "arg2": 20
+  "arg2": 20,
+  "operation": "sum"
 }
     </textarea>
     <br>
@@ -94,14 +95,15 @@
 {
   "arg1": 10,
   "arg2": 20,
-  "sum": 30,
+  "operation": "sum",
+  "result": 30,
   "execution_time_ms": 15
 }
     </textarea>
 
     <script>
         function executePost() {
-            const url = '/sum_and_save';
+            const url = '/arithmetic_operation';
             const data = document.getElementById('jsonPayload').value;
 
             // Get username and password from input fields

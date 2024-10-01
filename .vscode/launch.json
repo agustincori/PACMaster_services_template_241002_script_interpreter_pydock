@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Run Service_sum.py",
+            "name": "Run Service_math.py",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/Service_sum.py",
+            "program": "${workspaceFolder}/Service_math.py",
             "console": "integratedTerminal",
             "env": {
                 "PYTHONPATH": "${workspaceFolder}"
@@ -24,9 +24,9 @@
     ],
     "compounds": [
         {
-            "name": "Run Both (Service_sum.py and db_manager.py)",
+            "name": "Run Both (Service_math.py and db_manager.py)",
             "configurations": [
-                "Run Service_sum.py",
+                "Run Service_math.py",
                 "Run db_manager.py"
             ]
         }

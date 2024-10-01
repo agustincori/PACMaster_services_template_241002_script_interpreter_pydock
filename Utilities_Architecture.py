@@ -104,7 +104,7 @@ db_manager_PORT = os.getenv('db_manager_PORT', '20083')
 BASE_URL = f'http://{db_manager_HOST}:{db_manager_PORT}'
 
 # Get environment variables or set default values
-service_name = os.getenv('SERVICE_NAME', '240813_service_sum_pydock')
+service_name = os.getenv('SERVICE_NAME', '240813_service_math_pydock')
 id_service = int(os.getenv('ID_SERVICE', 1))
 service_data = {
     'service_name': service_name,
