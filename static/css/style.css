@@ -70,3 +70,29 @@ a:hover {
     color: #8d42a3;
     /* Dark cyan for examples */
 }
+
+/* Add the missing styles for text boxes */
+textarea, input[type="text"], input[type="password"], input[type="number"], select {
+    background-color: rgba(128, 0, 128, 0.2); /* Purple with transparency */
+    border: 2px solid purple;
+    border-radius: 15px;
+    color: #8617cf;
+    padding: 10px;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+}
+
+/* Specific style for buttons */
+button {
+    background-color: purple;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    border: none;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+button:hover {
+    background-color: #941694;
+}

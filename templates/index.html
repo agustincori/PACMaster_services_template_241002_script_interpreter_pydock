@@ -1,67 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Documentation - Sum and Save</title>
+    <!-- Your existing head content -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        /* Inline styles to ensure consistency */
-        textarea, button, input {
-            background-color: rgba(128, 0, 128, 0.2); /* Purple with transparency */
-            border: 2px solid purple;
-            border-radius: 15px;
-            color: #8617cf;
-            padding: 10px;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-        }
-        
-        button {
-            background-color: purple;
-            color: white;
-            padding: 10px 20px;
-            border-radius: 25px;
-            border: none;
-            cursor: pointer;
-            margin-top: 10px;
-        }
-
-        button:hover {
-            background-color: #941694;
-        }
-
-        body {
-            background-color: #0D0D0D;
-            color: #8617cf;
-            font-family: Arial, sans-serif;
-            line-height: 1.6;
-        }
-
-        h1, h2, h3 {
-            color: #8A2BE2;
-        }
-
-        p, .important {
-            color: #960df1;
-        }
-
-        .indent {
-            margin-left: 20px;
-        }
-
-        .input-field {
-            margin-bottom: 15px;
-        }
-    </style>
     <script src="{{ url_for('static', filename='js/script.js') }}" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
 </head>
-
 <body>
     <h1>Service Math</h1>
 
-    <!-- Moved username and password input fields here -->
+    <!-- Common input fields for username and password -->
     <div class="input-field">
         <label for="username">Username:</label><br>
         <input type="text" id="username" value="PAC"><br>
@@ -70,78 +18,14 @@
         <label for="password">Password:</label><br>
         <input type="password" id="password" value="pda)cYh(oBo6blBN@4n0e)U6UCOicJYe"><br>
     </div>
-    <!-- End of moved section -->
 
     <h2>Available Routes:</h2>
 
-    <h3>1. POST /arithmetic_operation</h3>
-    <p><b class="parameter">Description:</b> This route computes the sum of two numbers and saves the arguments and the result.</p>
-    <p><b class="important">Parameters:</b></p>
-    <ul class="indent">
-        <li><b class="parameter">arg1:</b> The first number (int or float)</li>
-        <li><b class="parameter">arg2:</b> The second number (int or float)</li>
-    </ul>
+    <!-- Include the arithmetic_operation route -->
+    {% include 'methods/arithmetic_operation.html' %}
 
-    <p><b class="important">Example Payload:</b></p>
-    <textarea id="jsonPayload" rows="8" cols="50">
-{
-  "arg1": 10,
-  "arg2": 20,
-  "operation": "sum"
-}
-    </textarea>
-    <br>
-    <button onclick="executePost()">Execute POST</button>
-
-    <h3>Result:</h3>
-    <textarea id="resultBox" rows="8" cols="50" readonly>
-{
-  "arg1": 10,
-  "arg2": 20,
-  "operation": "sum",
-  "result": 30,
-  "execution_time_ms": 15
-}
-    </textarea>
-
-    <script>
-        function executePost() {
-            const url = '/arithmetic_operation';
-            const data = document.getElementById('jsonPayload').value;
-
-            // Get username and password from input fields
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-
-            // Check if username and password are provided
-            if (!username || !password) {
-                alert("Please enter both username and password.");
-                return;
-            }
-
-            // Create Basic Authentication token
-            const authHeader = 'Basic ' + btoa(username + ':' + password);
-
-            // Execute POST request with Authorization header
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': authHeader
-                },
-                body: data
-            })
-            .then(response => response.json())
-            .then(result => {
-                document.getElementById('resultBox').value = JSON.stringify(result, null, 2);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                document.getElementById('resultBox').value = 'An error occurred: ' + error;
-            });
-        }
-    </script>
+    <!-- Properly commented out to prevent TemplateNotFound error -->
+    {# {% include 'methods/another_route.html' %} #}
 
 </body>
-
 </html>

@@ -1,0 +1,35 @@
+<h3>POST /arithmetic_operation</h3>
+<p><b class="parameter">Description:</b> This route performs an arithmetic operation between two numbers and saves the arguments and the result.</p>
+<p><b class="important">Parameters:</b></p>
+<ul class="indent">
+    <li><b class="parameter">arg1:</b> The first number (int or float)</li>
+    <li><b class="parameter">arg2:</b> The second number (int or float)</li>
+    <li><b class="parameter">operation:</b> The arithmetic operation to perform (string). Possible values: <code>'sum'</code>, <code>'diff'</code>, <code>'mult'</code>, <code>'div'</code>, <code>'pwr'</code>, <code>'root'</code></li>
+    <!-- Add any additional parameters if necessary -->
+</ul>
+
+<p><b class="important">Example Payload:</b></p>
+<textarea id="jsonPayload_arithmetic_operation" rows="8" cols="50">
+{
+  "arg1": 10,
+  "arg2": 20,
+  "operation": "sum"
+}
+</textarea>
+<br>
+
+<!-- Removed format label and dropdown -->
+<!-- <p><label for="format_arithmetic_operation">Select format:</label></p>
+<select id="format_arithmetic_operation" onchange="updatePayloadFormat('arithmetic_operation')">
+    <option value="json">JSON</option>
+    <option value="yaml">YAML</option>
+</select>
+<br> -->
+
+<!-- Updated the button label -->
+<button onclick="executePost('arithmetic_operation')">Execute</button>
+
+<h3>Result:</h3>
+<textarea id="resultBox_arithmetic_operation" rows="8" cols="50" readonly></textarea>
+
+<!-- Include any necessary scripts or styles specific to this route -->
