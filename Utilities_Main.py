@@ -1,13 +1,14 @@
 # Utilities_Main.py
 import yaml
 from Utilities_Architecture import log_to_api, arq_save_outcome_data, ArqValidations,ArqRuns
-from Utilities_error_handling import log_and_raise, ValidationError
+from Utilities_error_handling import log_and_raise, exception_handler_decorator,ValidationError
 from flask import request
 import os
 import base64
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'th3_s3cr3t_k3y')
 
+@exception_handler_decorator
 def compute_and_save(data, metadata, use_db=True):
     """
     Computes the result of a specified mathematical operation on two numbers and saves the arguments and the result.
@@ -18,7 +19,7 @@ def compute_and_save(data, metadata, use_db=True):
     - use_db (bool): Whether to use a database connection for logging and saving outcome data. Defaults to True.
 
     Returns:
-    - dict: A dictionary containing the arguments and the result of the computation.
+    - dict: A dictionary containing the result of the computation.
 
     Raises:
     - ValidationError: If 'arg1', 'arg2', or 'operation' are missing, or if the operation is invalid.
@@ -26,104 +27,67 @@ def compute_and_save(data, metadata, use_db=True):
     """
     id_run = metadata.get('id_run')
 
+    # Extract arguments
+    arg1 = data.get('arg1')
+    arg2 = data.get('arg2')
+    operation = data.get('operation')
+
+    # Check if arg1, arg2, and operation are provided
+    if arg1 is None or arg2 is None or operation is None:
+        raise ValidationError("arg1, arg2, and operation are required in data dictionary")
+
+    # Attempt to convert arg1 and arg2 to numbers
     try:
-        # Extract arguments
-        arg1 = data.get('arg1')
-        arg2 = data.get('arg2')
-        operation = data.get('operation')
+        arg1 = float(arg1)
+        arg2 = float(arg2)
+    except ValueError as ve:
+        raise ValidationError(f"arg1 and arg2 must be numbers. Error: {ve}")
 
-        # Check if arg1, arg2, and operation are provided
-        if arg1 is None or arg2 is None or operation is None:
-            log_and_raise(
-                ValidationError,
-                "arg1, arg2, and operation are required in data dictionary",
-                id_run=id_run,
-                context="compute_and_save"
-            )
+    # Perform the specified operation
+    if operation == "sum":
+        result = arg1 + arg2
+    elif operation == "diff":
+        result = arg1 - arg2
+    elif operation == "mult":
+        result = arg1 * arg2
+    elif operation == "div":
+        if arg2 == 0:
+            raise ZeroDivisionError("Cannot divide by zero")
+        result = arg1 / arg2
+    elif operation == "pwr":
+        result = arg1 ** arg2
+    elif operation == "root":
+        if arg1 < 0 and arg2 % 2 == 0:
+            raise ValidationError("Even roots of negative numbers are not allowed")
+        result = arg1 ** (1 / arg2)
+    else:
+        raise ValidationError(f"Invalid operation '{operation}' specified.- operations available are: sum, diff, mult, div, pwr, root")
 
-        # Attempt to convert arg1 and arg2 to numbers
-        try:
-            arg1 = float(arg1)
-            arg2 = float(arg2)
-        except ValueError as ve:
-            log_and_raise(
-                ValidationError,
-                f"arg1 and arg2 must be numbers. Error: {ve}",
-                id_run=id_run,
-                context="compute_and_save"
-            )
+    input_data = {"arg1": arg1, "arg2": arg2, "operation": operation}
 
-        # Perform the specified operation
-        if operation == "sum":
-            result = arg1 + arg2
-        elif operation == "diff":
-            result = arg1 - arg2
-        elif operation == "mult":
-            result = arg1 * arg2
-        elif operation == "div":
-            if arg2 == 0:
-                log_and_raise(
-                    ValidationError,
-                    "Division by zero is not allowed",
-                    id_run=id_run,
-                    context="compute_and_save"
-                )
-            result = arg1 / arg2
-        elif operation == "pwr":
-            result = arg1 ** arg2
-        elif operation == "root":
-            if arg1 < 0 and arg2 % 2 == 0:
-                log_and_raise(
-                    ValidationError,
-                    "Even roots of negative numbers are not allowed",
-                    id_run=id_run,
-                    context="compute_and_save"
-                )
-            result = arg1 ** (1 / arg2)
-        else:
-            log_and_raise(
-                ValidationError,
-                f"Invalid operation '{operation}' specified",
-                id_run=id_run,
-                context="compute_and_save"
-            )
-
-        input_data = {"arg1": arg1, "arg2": arg2, "operation": operation} 
-        # Save or log outcome data if necessary
-        if use_db:
-            log_to_api(metadata, log_message=f"Arguments: arg1 = {arg1}, arg2 = {arg2}, operation = {operation}, result = {result}", use_db=use_db)
-            arq_save_outcome_data(
-                metadata=metadata,
-                id_category=0,
-                id_type=0,
-                v_jsonb=input_data
-            )
-            arq_save_outcome_data(
-                metadata=metadata,
-                id_category=0,
-                id_type=1,
-                v_float=result
-            )
-            log_to_api(metadata, log_message="Income & outcome data saved successfully.", use_db=use_db)
-        else:
-            print("Income data:", input_data)
-
-        # Return the result data
-        return {
-            "result": result
-        }
-
-    except Exception as e:
-        error_message = f"An unexpected error occurred: {e}"
-        if use_db and id_run is not None:
-            log_to_api(metadata, log_message=error_message, error=True, use_db=use_db)
-        # Log and raise the exception
-        log_and_raise(
-            type(e),
-            error_message,
-            id_run=id_run,
-            context="compute_and_save"
+    # Save or log outcome data if necessary
+    if use_db:
+        log_to_api(metadata, log_message=f"Arguments: arg1 = {arg1}, arg2 = {arg2}, operation = {operation}, result = {result}", use_db=use_db)
+        arq_save_outcome_data(
+            metadata=metadata,
+            id_category=0,
+            id_type=0,
+            v_jsonb=input_data
         )
+        arq_save_outcome_data(
+            metadata=metadata,
+            id_category=0,
+            id_type=1,
+            v_float=result
+        )
+        log_to_api(metadata, log_message="Income & outcome data saved successfully.", use_db=use_db)
+    else:
+        print("Income data:", input_data)
+
+    # Return the result data
+    return {
+        "result": result
+    }
 
 def data_validation_metadata_generation(data):
     """

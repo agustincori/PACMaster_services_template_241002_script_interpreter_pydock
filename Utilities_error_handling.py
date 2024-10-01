@@ -227,3 +227,43 @@ def handle_exceptions(func, context=None, id_run=None):
         log_and_raise(type(e), f"{context} | {str(e)}", original_exception=e, context=context)
     except Exception as e:
         log_and_raise(APIError, f"{context} | Unexpected Error: {str(e)}", original_exception=e, context=context)
+
+
+
+
+def centralized_exception_handler(e, context=None, metadata=None):
+    """
+    Centralized exception handling.
+    Discriminates types of exceptions and raises the appropriate one.
+    """
+    id_run = metadata.get('id_run') if metadata else None
+    error_message = f"{context} | An error occurred: {str(e)}"
+
+    # Handle different exception types using log_and_raise
+    if isinstance(e, ValidationError):
+        # Log and raise ValidationError
+        log_and_raise(ValidationError, error_message, original_exception=e, context=context)
+    elif isinstance(e, ZeroDivisionError):
+        # Log and raise a ValidationError for division by zero
+        log_and_raise(ValidationError, f"{context} | Division by zero is not allowed", original_exception=e, context=context)
+    elif isinstance(e, HTTPError):
+        log_and_raise(HTTPError, error_message, original_exception=e, context=context)
+    elif isinstance(e, APIError):
+        log_and_raise(APIError, error_message, original_exception=e, context=context)
+    else:
+        # Log and raise general exceptions as APIError or CustomError
+        log_and_raise(APIError, error_message, original_exception=e, context=context)
+
+def exception_handler_decorator(func):
+    """
+    Decorator for centralizing exception handling.
+    """
+    def wrapper(*args, **kwargs):
+        metadata = kwargs.get('metadata', {})
+        context = func.__name__
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            # Call the centralized exception handler
+            centralized_exception_handler(e, context=context, metadata=metadata)
+    return wrapper
