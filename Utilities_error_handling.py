@@ -236,23 +236,54 @@ def centralized_exception_handler(e, context=None, metadata=None):
     Centralized exception handling.
     Discriminates types of exceptions and raises the appropriate one.
     """
-    id_run = metadata.get('id_run') if metadata else None
+    # Base error message
     error_message = f"{context} | An error occurred: {str(e)}"
 
-    # Handle different exception types using log_and_raise
-    if isinstance(e, ValidationError):
-        # Log and raise ValidationError
+    # Group exceptions for better organization
+    VALIDATION_EXCEPTIONS = (ValidationError, ZeroDivisionError)
+    HTTP_EXCEPTIONS = (HTTPError, requests.HTTPError)
+    REQUEST_EXCEPTIONS = (requests.Timeout, requests.ConnectionError, requests.RequestException)
+
+    # Handle Validation Errors
+    if isinstance(e, VALIDATION_EXCEPTIONS):
+        if isinstance(e, ZeroDivisionError):
+            error_message = f"{context} | Division by zero is not allowed"
         log_and_raise(ValidationError, error_message, original_exception=e, context=context)
-    elif isinstance(e, ZeroDivisionError):
-        # Log and raise a ValidationError for division by zero
-        log_and_raise(ValidationError, f"{context} | Division by zero is not allowed", original_exception=e, context=context)
-    elif isinstance(e, HTTPError):
+
+    # Handle HTTP Errors
+    elif isinstance(e, HTTP_EXCEPTIONS):
+        response = getattr(e, 'response', None)
+        if response is not None:
+            try:
+                error_info = response.json()
+                server_error_details = error_info.get('error', "No 'error' field in server response.")
+            except ValueError:
+                server_error_details = response.text or "No detailed error message from server."
+            error_message = f"{context} | External Service Error: {str(e)}. Server response: {server_error_details}"
+        else:
+            error_message = f"{context} | External Service Error: {str(e)}"
         log_and_raise(HTTPError, error_message, original_exception=e, context=context)
+
+    # Handle Request Exceptions
+    elif isinstance(e, REQUEST_EXCEPTIONS):
+        if isinstance(e, requests.Timeout):
+            error_message = f"{context} | External Service Error: Timeout Error: {str(e)}"
+        elif isinstance(e, requests.ConnectionError):
+            error_message = f"{context} | External Service Error: Connection Error: {str(e)}"
+        else:  # requests.RequestException
+            error_message = f"{context} | External Service Error: Request Error: {str(e)}"
+        log_and_raise(APIError, error_message, original_exception=e, context=context)
+
+    # Handle API Errors
     elif isinstance(e, APIError):
         log_and_raise(APIError, error_message, original_exception=e, context=context)
+
+    # Handle Other Exceptions
     else:
-        # Log and raise general exceptions as APIError or CustomError
+        error_message = f"{context} | Unexpected Error: {str(e)}"
         log_and_raise(APIError, error_message, original_exception=e, context=context)
+
+        
 
 def exception_handler_decorator(func):
     """
