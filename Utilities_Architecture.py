@@ -1,99 +1,28 @@
 """
 Utilities_Architecture.py
 
-This module contains utility functions to interact with a specific API for logging, user identification, managing run outcomes, and handling API requests.
+This module provides utility functions to interact with a specific API for logging, user identification, run management, and handling API requests. 
 
 Functions:
-    log_to_api(metadata, log_message, debug=False, warning=False, error=False, use_db=True):
-        Sends a log message to the API with an associated run ID and log type indicators.
-
-        Args:
-            metadata (dict): Contains metadata, including:
-                - id_run (int): The run ID associated with the log message.
-                - user (str): Username for authentication.
-                - password (str): Password for authentication.
-            log_message (str): The log message to send.
-            debug (bool, optional): Indicates if the log is a debug message. Defaults to False.
-            warning (bool, optional): Indicates if the log is a warning message. Defaults to False.
-            error (bool, optional): Indicates if the log is an error message. Defaults to False.
-            use_db (bool, optional): Determines whether to send the log to the API or just print it. Defaults to True.
-
-    arq_get_new_id_run(metadata):
-        Generates a new run ID for a script and logs the operation.
-
-        Args:
-            metadata (dict): Contains the necessary data to create a new run ID, including:
-                - id_script (int): The unique identifier for the script whose run ID is being created.
-                - id_user (int): The unique identifier for the user.
-                - id_father_service (int, optional): The identifier of the father service.
-                - id_father_run (str, optional): The run ID of the parent operation, if applicable.
-                - user (str): Username for authentication.
-                - password (str): Password for authentication.
-
-    arq_update_run_fields(metadata, status=None):
-        Updates the run status using the provided metadata and optional status value.
-
-        Args:
-            metadata (dict): Contains the necessary data to update the run status, including:
-                - id_run (int): The run ID to update.
-                - user (str): Username for authentication.
-                - password (str): Password for authentication.
-            status (int, optional): The new status value to set. Defaults to None.
-
-    arq_user_identify(metadata):
-        Identifies the user by calling the user validation API and updates the run status accordingly.
-
-        Args:
-            metadata (dict): Contains necessary information to identify the user and update run status, including:
-                - user (str): The username for authentication.
-                - password (str): The password for authentication.
-                - id_run (int): The run ID for logging and updating the run.
-
-    get_data_type(id_category, id_type, id_run=None):
-        Fetches data types from the API based on category and type IDs.
-
-        Args:
-            id_category (int): The ID of the category to filter the data types.
-            id_type (int): The ID of the type to filter the data types.
-            id_run (int, optional): The ID of the associated run for logging purposes. Defaults to None.
-
-    arq_save_outcome_data(new_run_id, id_category, id_type, v_integer=None, v_float=None, v_string=None, v_boolean=None, v_timestamp=None, v_jsonb=None):
-        Submits outcome data for a given run ID.
-
-        Args:
-            new_run_id (int): The new run ID for which to save the outcome.
-            id_category (int): The category ID for the outcome.
-            id_type (int): The type ID for the outcome.
-            v_integer (int, optional): An integer value associated with the outcome.
-            v_float (float, optional): A floating-point value associated with the outcome.
-            v_string (str, optional): A string value associated with the outcome.
-            v_boolean (bool, optional): A boolean value associated with the outcome.
-            v_timestamp (datetime, optional): A timestamp associated with the outcome. Defaults to None.
-            v_jsonb (dict, optional): A JSONB field containing additional data.
-
-    update_run_fields(id_run, id_user=None, status=None):
-        Updates fields of a run, such as user ID and status.
-
-        Args:
-            id_run (int): The ID of the run to update.
-            id_user (int, optional): The user ID to update. Defaults to None.
-            status (int, optional): The status to update. Defaults to None.
-
-    arq_handle_api_request(url, payload=None, method='POST', id_run=None):
-        Sends an API request with error handling and logging.
-
-        Args:
-            url (str): The URL of the API endpoint to which the request is sent.
-            payload (dict, optional): The data to be sent in the request body (for POST) or as query parameters (for GET). Defaults to None.
-            method (str, optional): The HTTP method to use for the request ('POST' or 'GET'). Defaults to 'POST'.
-            id_run (int, optional): The ID of the associated run for logging purposes. Defaults to None.
+    - log_to_api: Sends log messages to the API with metadata for debugging, warning, or error tracking.
+    - arq_get_new_id_run: Generates and logs a new run ID for a script based on metadata.
+    - arq_update_run_fields: Updates the run status or fields based on provided metadata.
+    - arq_user_identify: Identifies and validates a user through an API request, updating the run status.
+    - get_data_type: Fetches data types from the API based on category and type IDs.
+    - arq_save_outcome_data: Submits outcome data for a run, supporting multiple data types.
+    - update_run_fields: Updates run fields such as status or user ID.
+    - arq_handle_api_request: Sends API requests with error handling, supporting token and Basic Authentication.
+    - ArqRuns class: Manages run creation and updates, including status and metadata handling.
+    - ArqValidations class: Handles user validation, token verification, and refresh logic.
+    
+Each method contains detailed descriptions and argument lists in its individual docstring.
 """
 
 import requests
 import os
 from datetime import datetime
 import time
-from Utilities_error_handling import handle_exceptions,ValidationError,exception_handler_decorator
+from Utilities_error_handling import ValidationError,exception_handler_decorator
 import Utilities_data_type
 import base64
 import jwt
@@ -141,8 +70,6 @@ def log_to_api(metadata, log_message, debug=False, warning=False, error=False, u
 
     # Extract values from metadata
     id_run = metadata.get('id_run', None)
-    user = metadata.get('user')
-    password = metadata.get('password')
 
     if not use_db or id_run is None:
         print(log_message_with_timestamp)  # Print the log message with timestamp
@@ -172,8 +99,8 @@ def log_to_api(metadata, log_message, debug=False, warning=False, error=False, u
 
 
 
-
     
+@exception_handler_decorator
 def get_data_type(id_category, id_type, id_run=None):
     """
     Retrieves data types based on category and type IDs from a specified endpoint.
@@ -189,7 +116,6 @@ def get_data_type(id_category, id_type, id_run=None):
     
     Returns:
         dict: The response from the server if the request was successful and the server responded with data.
-        dict: JSON object with error details if the request failed or the server responded with a status code indicating an error.
     """
     
     # Define the endpoint URL
@@ -200,20 +126,11 @@ def get_data_type(id_category, id_type, id_run=None):
         'id_category': id_category,
         'id_type': id_type,
     }
-    
-    try:
-        # Make a request using the centralized arq_handle_api_request function
-        response = handle_exceptions(
-            lambda: arq_handle_api_request(url, payload=params,method='GET', id_run=id_run),
-            context=f"get_data_type: {url}",
-            id_run=id_run
-        )
-        return response
 
-    except Exception as e:
-        # Log the exception before raising it further
-        log_to_api(id_run, f"Exception in get_data_type: {str(e)}", error=True)
-        raise
+    # Make a request using the centralized arq_handle_api_request function
+    response = arq_handle_api_request(url, payload=params, method='GET', metadata={'id_run': id_run})
+    
+    return response
 
 def arq_save_outcome_data(metadata, id_category, id_type, v_integer=None, v_float=None, v_string=None, v_boolean=None, v_timestamp=None, v_jsonb=None):
     """

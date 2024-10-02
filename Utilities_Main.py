@@ -1,7 +1,7 @@
 # Utilities_Main.py
 import yaml
 from Utilities_Architecture import log_to_api, arq_save_outcome_data, ArqValidations,ArqRuns
-from Utilities_error_handling import log_and_raise, exception_handler_decorator,ValidationError
+from Utilities_error_handling import exception_handler_decorator,ValidationError
 from flask import request
 import os
 import base64
@@ -127,21 +127,30 @@ def data_validation_metadata_generation(data):
         return None, None
 
 
+    @exception_handler_decorator
     def create_new_run_id(metadata):
         """
-        Create a new run ID based on the metadata. 
+        Create a new run ID based on the metadata.
         Ensure user and password are available before creating a new run.
+        Args:
+            metadata (dict): Contains information needed to create a new run, including 'id_father_run', 'id_father_service', and 'id_script'.
+        Returns:
+            dict: Response containing the new run ID.\
+        Raises:
+            ValidationError: If 'id_father_service' or 'id_script' are not provided when required.
         """
-        if metadata["id_father_run"] is not None and metadata["id_father_service"] is None:
-            log_and_raise(ValidationError, "id_father_service is required when id_father_run is provided", id_run=metadata.get("id_run"), context="create_new_run_id")
-
-        if metadata["id_script"] is None:
-            log_and_raise(ValidationError, "id_script is required and cannot be None", id_run=metadata.get("id_run"), context="create_new_run_id")
-
+        # Validate presence of id_father_service if id_father_run is provided
+        if metadata.get("id_father_run") is not None and metadata.get("id_father_service") is None:
+            raise ValidationError("id_father_service is required when id_father_run is provided", metadata.get("id_run"))
+        # Validate presence of id_script
+        if metadata.get("id_script") is None:
+            raise ValidationError("id_script is required and cannot be None", metadata.get("id_run"))
+        # Call to get a new run ID
         new_run_id_response = ArqRuns.get_new_id_run(metadata)
-
-        # Update metadata with new run ID
+        # Update metadata with the new run ID
         metadata["id_run"] = new_run_id_response.get('id_run')
+        # Return the updated metadata with the new run ID
+        return metadata
 
     try:
         # Step 1: Ensure the user and password are available before creating the run
@@ -164,32 +173,27 @@ def data_validation_metadata_generation(data):
         raise
 
     
+@exception_handler_decorator
 def parse_request_data():
     """
     Parses the request data based on the Content-Type header.
 
     Returns:
-    dict: The parsed data from the request.
+        dict: The parsed data from the request.
 
     Raises:
-    ValidationError: If the content type is unsupported or parsing fails.
+        ValidationError: If the content type is unsupported or parsing fails.
     """
     if request.content_type in ['application/x-yaml', 'text/yaml']:
         try:
             data = yaml.safe_load(request.data)  # Parse the YAML payload
             return data
         except yaml.YAMLError as e:
-            log_and_raise(
-                ValidationError,
-                f"YAML parsing error: {str(e)}",
-                context="parse_request_data"
-            )
+            raise ValidationError(f"YAML parsing error: {str(e)}")
+    
     elif request.content_type == 'application/json':
         data = request.get_json()  # Parse JSON payload
         return data
+    
     else:
-        log_and_raise(
-            ValidationError,
-            "Unsupported content type. Use application/json or application/x-yaml.",
-            context="parse_request_data"
-        )
+        raise ValidationError("Unsupported content type. Use application/json or application/x-yaml.")

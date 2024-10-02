@@ -34,7 +34,7 @@ from flask import Flask, request, jsonify, render_template
 from waitress import serve
 from Utilities_Main import compute_and_save, data_validation_metadata_generation,parse_request_data
 from Utilities_Architecture import log_to_api, arq_save_outcome_data,ArqRuns,service_data
-from Utilities_error_handling import log_and_raise, format_error_response, ValidationError, HTTPError, APIError
+from Utilities_error_handling import format_error_response
 
 logging.basicConfig(level=logging.DEBUG)  # Configures logging to display all debug messages
 
