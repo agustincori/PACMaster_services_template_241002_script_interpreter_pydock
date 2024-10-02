@@ -93,7 +93,7 @@ import requests
 import os
 from datetime import datetime
 import time
-from Utilities_error_handling import handle_exceptions,ValidationError
+from Utilities_error_handling import handle_exceptions,ValidationError,exception_handler_decorator
 import Utilities_data_type
 import base64
 import jwt
@@ -267,6 +267,52 @@ def arq_save_outcome_data(metadata, id_category, id_type, v_integer=None, v_floa
         log_to_api(metadata, f"Exception in arq_user_identify: {str(e)}", error=True)
         raise
 
+
+@exception_handler_decorator
+def arq_handle_api_request(url, payload=None, metadata=None, method='POST'):
+    """
+    Sends an API request with error handling, token authentication, or Basic Authentication (user/password).
+
+    Args:
+        url (str): The URL of the API endpoint to which the request is sent.
+        payload (dict, optional): The data to be sent in the request body (for POST) or as query parameters (for GET). Defaults to None.
+        metadata (dict, optional): Contains 'token_access' for Bearer token authentication, or 'user' and 'password' for Basic Authentication. Defaults to None.
+        method (str): The HTTP method to use for the request ('POST' or 'GET'). Defaults to 'POST'.
+
+    Returns:
+        dict: The parsed JSON response from the API if the request is successful.
+
+    Raises:
+        APIError: If the response status code is not 200 or if a network error occurs.
+    """
+    headers = {}
+    payload = payload or {}  # Ensure payload is not None
+
+    # Token Authentication: Add token_access to headers as Bearer token
+    if metadata and 'token_access' in metadata and metadata['token_access'] is not None:
+        headers['Authorization'] = f"Bearer {metadata['token_access']}"
+
+    # Basic Authentication: Add Authorization header
+    elif metadata and 'user' in metadata and 'password' in metadata:
+        auth_string = f"{metadata['user']}:{metadata['password']}"
+        auth_header = base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
+        headers['Authorization'] = f'Basic {auth_header}'
+
+    # Make the actual request based on method type
+    if method.upper() == 'POST':
+        response = requests.post(url, json=payload, headers=headers)
+    elif method.upper() == 'GET':
+        response = requests.get(url, params=payload, headers=headers)
+    else:
+        raise ValueError(f"Unsupported HTTP method: {method}")
+
+    # Raise an HTTP error for bad responses
+    response.raise_for_status()
+
+    # Return the parsed JSON response
+    return response.json()
+
+
 class ArqRuns:
     @staticmethod
     def get_new_id_run(metadata):
@@ -434,61 +480,6 @@ class ArqRuns:
             raise
 
 
-def arq_handle_api_request(url, payload=None, metadata=None, method='POST'):
-    """
-    Sends an API request with error handling, token authentication, or Basic Authentication (user/password).
-
-    Args:
-        url (str): The URL of the API endpoint to which the request is sent.
-        payload (dict, optional): The data to be sent in the request body (for POST) or as query parameters (for GET). Defaults to None.
-        metadata (dict, optional): Contains 'token' for token authentication, or 'user' and 'password' for Basic Authentication. Defaults to None.
-        method (str): The HTTP method to use for the request ('POST' or 'GET'). Defaults to 'POST'.
-
-    Returns:
-        dict: The parsed JSON response from the API if the request is successful.
-
-    Raises:
-        APIError: If the response status code is not 200 or if a network error occurs.
-    """
-
-    headers = {}
-
-    # Check for token in metadata and add it to payload
-    if 'token_access' in metadata and metadata['token_access'] is not None and 'token_refresh' in metadata and metadata['token_refresh'] is not None:
-        if not payload:
-            payload = {}
-        payload['token_access'] = metadata['token_access']
-        payload['token_refresh'] = metadata['token_refresh']
-    # Check for Basic Authentication (user and password) in metadata and add it to headers
-    elif metadata and 'user' in metadata and metadata['user'] is not None and 'password' in metadata and  metadata['password'] is not None:
-        auth_string = f"{metadata['user']}:{metadata['password']}"
-        auth_header = base64.b64encode(auth_string.encode('utf-8')).decode('utf-8')
-        headers['Authorization'] = f'Basic {auth_header}'
-
-    def request_func():
-        if method.upper() == 'POST':
-            response = requests.post(url, json=payload, headers=headers)
-        elif method.upper() == 'GET':
-            response = requests.get(url, params=payload, headers=headers)
-        else:
-            raise ValueError(f"Unsupported HTTP method: {method}")
-
-        # If the response status code indicates an error, raise an HTTPError
-        response.raise_for_status()
-        return response
-
-    try:
-        # Use handle_exceptions to manage error handling and logging
-        response = handle_exceptions(request_func, context=f"arq_handle_api_request: {url}")
-        return response.json()
-
-    except Exception as e:
-        raise
-
-
-
-
-
 class ArqValidations:
     @staticmethod
     def validate_auth(metadata):
@@ -642,3 +633,7 @@ class ArqValidations:
 
         except Exception as e:
             raise
+
+
+
+
