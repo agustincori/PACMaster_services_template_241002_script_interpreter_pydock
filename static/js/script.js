@@ -58,11 +58,17 @@ function executePost(route) {
     // Create Basic Authentication token
     const authHeader = 'Basic ' + btoa(username + ':' + password);
 
+    // Try parsing as JSON
     try {
         data = JSON.parse(dataText);
     } catch (e) {
-        alert('Invalid JSON payload');
-        return;
+        // If JSON parsing fails, try parsing as YAML
+        try {
+            data = yamlToJson(dataText);
+        } catch (e2) {
+            alert('Invalid input format. Please enter valid JSON or YAML.');
+            return;
+        }
     }
 
     fetch(url, {

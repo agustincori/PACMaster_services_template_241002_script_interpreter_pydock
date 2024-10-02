@@ -100,7 +100,7 @@ def sum_and_save_route():
 
     except Exception as e:
         error_response, status_code = format_error_response(
-            service_name="math_service",
+            service_name=service_data['service_name'],
             route_name=route_name,
             exception=e,
             id_run=id_run

@@ -300,6 +300,7 @@ class ArqRuns:
             'id_user': metadata.get('id_user'),
             'father_service_id': metadata.get('id_father_service'),
             'id_run_father': metadata.get('id_father_run'),
+            'service_name': service_data.get('service_name'),  # Assuming service_name is in metadata
         }
 
         url = f"{BASE_URL}/create_new_run"
