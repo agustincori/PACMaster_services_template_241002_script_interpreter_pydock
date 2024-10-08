@@ -1,3 +1,0 @@
-Flask
-psycopg2-binary
-Flask-Cors==3.0.10

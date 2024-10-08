@@ -1,0 +1,11 @@
+env_variables:
+  reused_var: abc
+  input_arg1: 1
+  input_arg2: 2
+stack_scripts:
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: sum

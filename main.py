@@ -1,11 +1,11 @@
 """
-Flask API for Customer Service Application
+Flask API for Script Interpreter Service
 
 Main Features:
 
 Routes:
 - GET /: Summary of routes.
-- POST /sum_and_save: Computes the sum of two numbers and saves the arguments and result.
+- POST /execute_script_stack: Executes a stack of scripts based on the provided payload.
 
 Dependencies:
 - Flask: Web framework for building the API.
@@ -17,7 +17,7 @@ Environment Variables:
 - PORT: Specifies the port on which the application will listen.
 
 Examples:
-  POST http://localhost:PORT/sum_and_save
+  POST http://localhost:PORT/execute_script_stack
 
 Author: Agustín Corigliano
 Version: 1.1.0
@@ -31,56 +31,82 @@ import time
 import os
 import logging
 from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
 from waitress import serve
-from Utilities_Main import compute_and_save, data_validation_metadata_generation,parse_request_data
-from Utilities_Architecture import log_to_api, arq_save_outcome_data,ArqRuns,service_data
-from Utilities_error_handling import format_error_response
+import requests
+from Utilities_Main import (
+    data_validation_metadata_generation,
+    parse_request_data,
+    ScriptManagement
+)
+from Utilities_Architecture import (
+    log_to_api,
+    arq_save_outcome_data,
+    ArqRuns,
+    service_data,
+)
+from Utilities_error_handling import format_error_response, ValidationError
 
 logging.basicConfig(level=logging.DEBUG)  # Configures logging to display all debug messages
 
 app = Flask(__name__)
+CORS(app, expose_headers=["token_access"])  # Allow custom 'token-access' header
 
-@app.route("/arithmetic_operation", methods=["POST"])
-def sum_and_save_route():
+@app.route("/execute_script_stack", methods=["POST"])
+def execute_script_stack():
     """
-    Handles the /sum_and_save API endpoint.
+    Route to execute a stack of scripts based on a JSON or YAML payload.
 
-    This route parses the request data, validates metadata, and logs important information.
-    It delegates the summation logic to the sum_and_save function and returns appropriate responses.
-    
+    Payload Structure:
+        env_variables:
+            reused_var=abc
+        stack_scripts:
+        - service: "instrument_service"
+            endpoint: "/script1"
+            payload: {...}
+        - service: "device_service"
+            endpoint: "/script2"
+            payload: {...}
+        - service: "instrument_service"
+            endpoint: "/script3"
+            payload: {...}
+
     Returns:
-    - JSON: A response containing the result of the summation and metadata such as execution time.
-      If an error occurs, an error message is returned.
+    - JSON response containing the results of each script call.
     """
-    
     script_start_time = time.time()
-    route_name = 'arithmetic_operation'
+    route_name = 'execute_script_stack'
     logging.debug(f'Starting {route_name} process.')
     id_script = 0  # Default id_script value
     id_run = None
     try:
-        # Step 1: Parse the request data
-        input_json = request.get_json()
-        input_json.setdefault("id_script", id_script)  # Ensure id_script is set
-        input_json["script_start_time"] = script_start_time
+        # Step 1: Parse the request data (supports JSON and YAML)
+        input_data = parse_request_data()
+        input_data.setdefault("id_script", id_script)  # Ensure id_script is set
+        input_data["script_start_time"] = script_start_time
 
-        
         # Step 2: Validate metadata
-        metadata = data_validation_metadata_generation(input_json)
+        metadata = data_validation_metadata_generation(input_data)
         id_run = metadata.get("id_run")
         use_db = metadata.get("use_db", True)
 
         # Step 3: Log the start of the operation
         log_to_api(metadata, log_message=f'{route_name} starts.', use_db=use_db)
 
-        # Step 4: Perform the summation
-        result_data = compute_and_save(input_json, metadata, use_db=use_db)
+        # Step 4: Extract common_data and stack_scripts
+        script = ScriptManagement.extract_script_data(input_data,metadata)
+        
+        # Step 5: Process the scripts using the script_process method
+        results = ScriptManagement.script_process(script,metadata)
 
-        # Step 5: Calculate execution time
+        # Step 6: Calculate execution time
         execution_time_ms = int((time.time() - script_start_time) * 1000)
-        result_data["execution_time_ms"] = execution_time_ms
+        result_output = {
+            "results": results,
+            "execution_time_ms": execution_time_ms
+        }
 
-        # Step 6: Save execution time and metadata to the database if necessary
+        # Step 7: Save execution time and metadata to the database if necessary
         if use_db and id_run:
             arq_save_outcome_data(
                 metadata=metadata,
@@ -89,14 +115,14 @@ def sum_and_save_route():
                 v_integer=execution_time_ms
             )
 
-        # Step 7: Log the completion and execution time
-        log_to_api(metadata, log_message=f"total execution_time_ms={execution_time_ms}", use_db=use_db)
+        # Step 8: Log the completion and execution time
+        log_to_api(metadata, log_message=f"Total execution_time_ms={execution_time_ms}", use_db=use_db)
         log_to_api(metadata, log_message=f"{route_name} ends.", use_db=use_db)
 
-        # Step 8: Update run fields and return the result
+        # Step 9: Update run fields and return the result
         success_status = 200
         ArqRuns.update_run_fields(metadata, status=success_status)
-        return jsonify(result_data), success_status
+        return jsonify(result_output), success_status
 
     except Exception as e:
         error_response, status_code = format_error_response(
@@ -106,10 +132,8 @@ def sum_and_save_route():
             id_run=id_run
         )
         if id_run is not None:
-            ArqRuns.update_run_fields(metadata, status=status_code,milestone_msg=error_response)
+            ArqRuns.update_run_fields(metadata, status=status_code, milestone_msg=error_response)
         return jsonify(error_response), status_code
-
-
 
 @app.route("/")
 def summary():
@@ -119,5 +143,5 @@ def summary():
     return render_template("index.html")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10033))  # Use port from environment variable or default to 10033
+    port = int(os.environ.get("PORT", 10034))  # Use port from environment variable or default to 10033
     serve(app, host="0.0.0.0", port=port)

@@ -26,19 +26,25 @@ from Utilities_error_handling import ValidationError,exception_handler_decorator
 import Utilities_data_type
 import base64
 import jwt
+import json
 
 # Obtener host y puerto desde variables de entorno
 db_manager_HOST = os.getenv('db_manager_HOST', 'localhost')
 db_manager_PORT = os.getenv('db_manager_PORT', '20083')
 BASE_URL = f'http://{db_manager_HOST}:{db_manager_PORT}'
 
+# Define the environment variable with the updated structure directly in the default argument
+service_arch = os.getenv("service_arch", '{"service_math": {"host": "240813_service_math_pydock", "port": 10033}}')
 # Get environment variables or set default values
-service_name = os.getenv('SERVICE_NAME', '240813_service_math_pydock')
-id_service = int(os.getenv('ID_SERVICE', 1))
+service_name = os.getenv('SERVICE_NAME', '241002_script_interpreter_pydock')
+id_service = int(os.getenv('ID_SERVICE', 0))
 service_data = {
     'service_name': service_name,
-    'id_service': id_service
+    'id_service': id_service,
+    'service_arch': service_arch  # Añadir el diccionario service_arch
 }
+
+
 
 # Set the secret key from environment variables or use a default value
 SECRET_KEY = os.getenv('SECRET_KEY', 'th3_s3cr3t_k3y')
@@ -436,10 +442,8 @@ class ArqValidations:
                         metadata['id_user'] = id_user
                         return metadata
                     except ValidationError as refresh_error:
-                        # If token refresh fails, fall back to user identification
-                        result = ArqValidations.user_identify(metadata)
-                        metadata.update(result)
-                        return metadata
+                        # If token refresh fails, raise an expired token exception
+                        raise ValidationError("The token has expired and could not be refreshed.")
                 else:
                     raise e
         else:
