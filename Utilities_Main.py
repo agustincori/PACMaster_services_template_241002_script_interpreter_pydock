@@ -133,10 +133,13 @@ def data_validation_metadata_generation(data):
         Returns:
         - token_access (str): The value of the token_access header, or None if not provided.
         """
-        token_access = request.headers.get("token-access")  # Updated to token-access
-        if token_access:
+        auth_header = request.headers.get("Authorization")
+        
+        if auth_header and auth_header.startswith("Bearer "):
+            token_access = auth_header.split(" ")[1]  # Extract the token after 'Bearer'
             return token_access
-        return None
+        else:
+            return None
 
     @exception_handler_decorator
     def create_new_run_id(metadata):

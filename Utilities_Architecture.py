@@ -34,7 +34,7 @@ db_manager_PORT = os.getenv('db_manager_PORT', '20083')
 BASE_URL = f'http://{db_manager_HOST}:{db_manager_PORT}'
 
 # Define the environment variable with the updated structure directly in the default argument
-service_arch = os.getenv("service_arch", '{"service_math": {"host": "240813_service_math_pydock", "port": 10033}}')
+service_arch = os.getenv("service_arch", '{"service_math": {"host": "localhost", "port": 10033}}')
 # Get environment variables or set default values
 service_name = os.getenv('SERVICE_NAME', '241002_script_interpreter_pydock')
 id_service = int(os.getenv('ID_SERVICE', 0))
