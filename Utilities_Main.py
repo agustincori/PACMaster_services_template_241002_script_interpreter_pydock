@@ -291,14 +291,16 @@ class ScriptManagement:
         results = []
 
         # Execute each script in the stack
-        for stack_script in stack_scripts:
-            service = stack_script.get("service")
-            endpoint = stack_script.get("endpoint")
-            payload = stack_script.get("payload")
+        for step_script in stack_scripts:
+            service = step_script.get("service")
+            endpoint = step_script.get("endpoint")
+            payload = step_script.get("payload")
+            payload["id_father_run"] = metadata.get("id_run")
+            payload["id_father_service"] = service_data.get("id_service")
 
             # Validate the script details
             if not service or not endpoint or payload is None:
-                raise ValidationError(f"Invalid script details in stack_scripts: {stack_script}")
+                raise ValidationError(f"Invalid script details in stack_scripts: {step_script}")
 
             try:
                 # Get the host and port using the get_service_host_port function

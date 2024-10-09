@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 5000 8080
 
 # Define the command to run your application
-CMD ["python", "main.py"]
+CMD ["sh", "-c", "gunicorn -w 4 -b 0.0.0.0:$PORT main:app"]

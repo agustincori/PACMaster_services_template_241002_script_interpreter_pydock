@@ -27,6 +27,8 @@ import Utilities_data_type
 import base64
 import jwt
 import json
+from jwt.exceptions import ExpiredSignatureError, InvalidTokenError, DecodeError, InvalidSignatureError, InvalidIssuerError, InvalidAudienceError, InvalidIssuedAtError, MissingRequiredClaimError
+
 
 # Obtener host y puerto desde variables de entorno
 db_manager_HOST = os.getenv('db_manager_HOST', 'localhost')
@@ -447,16 +449,21 @@ class ArqValidations:
                 else:
                     raise e
         else:
-            # No token provided, proceed with username and password authentication
-            result = ArqValidations.user_identify(metadata)
-            metadata.update(result)
-            return metadata
-           
+            re_authenticate = False  # Define the re_authenticate boolean
+            if re_authenticate:
+                # If re_authenticate is True, proceed with username and password authentication
+                result = ArqValidations.user_identify(metadata)
+                metadata.update(result)
+                return metadata
+            else:
+                # If re_authenticate is False, raise an error for no token provided
+                raise ValidationError("No token provided")
+
     @staticmethod
     def validate_token(token):
         """
         Validate the token. If it's valid, return the user ID. 
-        Otherwise, raise an exception.
+        Otherwise, raise an exception with details about the failure.
         
         Args:
             token (str): The JWT token to validate.
@@ -465,16 +472,36 @@ class ArqValidations:
             int: The user ID if the token is valid.
             
         Raises:
-            ValidationError: If the token is expired or invalid.
+            ValidationError: If the token is expired or invalid, with specific details.
         """
         try:
+            # Attempt to decode the token using the secret key and expected algorithm
             decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            return decoded.get("user_id")
-        except jwt.ExpiredSignatureError:
-            raise ValidationError("Token has expired")
-        except jwt.InvalidTokenError:
+            return decoded.get("id_user")  # Assuming 'id_user' is the correct key here
         
-            raise ValidationError("Invalid token")
+        except ExpiredSignatureError:
+            raise ValidationError("Token has expired")
+        
+        except InvalidSignatureError:
+            raise ValidationError("Token signature is invalid")
+        
+        except InvalidIssuerError:
+            raise ValidationError("Token has an invalid issuer")
+        
+        except InvalidAudienceError:
+            raise ValidationError("Token has an invalid audience")
+        
+        except InvalidIssuedAtError:
+            raise ValidationError("Token's 'issued at' time is invalid (in the future)")
+        
+        except MissingRequiredClaimError as e:
+            raise ValidationError(f"Token is missing a required claim: {str(e)}")
+        
+        except DecodeError:
+            raise ValidationError("Token is malformed and could not be decoded")
+        
+        except InvalidTokenError:
+            raise ValidationError("Token is invalid for an unspecified reason")
         
     @staticmethod
     def refresh_token(metadata):
