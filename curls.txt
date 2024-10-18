@@ -1,1 +1,15 @@
-Invoke-RestMethod -Uri http://localhost:10034/execute_script_stack -Method Post -ContentType "application/x-yaml" -InFile "./scripts/module.yaml" -Headers @{ "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF91c2VyIjowLCJleHAiOjE3Mjg1Nzg4MzIsImlhdCI6MTcyODQ5MjQzMn0.HARqOldQ342QOQEwEo9aknG3PywFUogGi1hkydjExpM" }
+Invoke-RestMethod -Uri http://localhost:10034/execute_script_stack -Method Post -ContentType "application/x-yaml" -InFile "./scripts/module.yaml" -Headers @{ "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF91c2VyIjowLCJleHAiOjE3MjkyNjI1NzIsImlhdCI6MTcyOTE3NjE3Mn0.lMsZJQr32OF8pOIy4632x-IkvxOpO36t1WJ4v8PLWyc"; "X-Script-Name" = "module.yaml" }
+Invoke-RestMethod -Uri http://localhost:10034/execute_script_stack -Method Post -ContentType "application/x-yaml" -InFile "./scripts/module.yaml" -Headers @{ "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF91c2VyIjowLCJleHAiOjE3MjkyNjI1NzIsImlhdCI6MTcyOTE3NjE3Mn0.lMsZJQr32OF8pOIy4632x-IkvxOpO36t1WJ4v8PLWyc"; "X-Script-Name" = "service_math_test.yaml" }
+
+
+
+
+
+### ASI PARA LEER DESDE LA CARPETA Scripts ####
+Invoke-RestMethod -Uri http://localhost:10034/execute_script_stack -Method Post -ContentType "application/x-yaml" -Headers @{ "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF91c2VyIjowLCJleHAiOjE3MjkyNjI1NzIsImlhdCI6MTcyOTE3NjE3Mn0.lMsZJQr32OF8pOIy4632x-IkvxOpO36t1WJ4v8PLWyc"; "X-Script-Name" = "service_math_test.yaml" }
+
+
+
+### ASI PARA PASAR DIRECTAMENTE EL FILE POR EL POST REQUEST ###
+
+Invoke-RestMethod -Uri http://localhost:10034/execute_script_stack -Method Post -ContentType "application/x-yaml" -Body (Get-Content -Path "./scripts/module.yaml" -Raw) -Headers @{ "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF91c2VyIjowLCJleHAiOjE3MjkyNjI1NzIsImlhdCI6MTcyOTE3NjE3Mn0.lMsZJQr32OF8pOIy4632x-IkvxOpO36t1WJ4v8PLWyc" }

@@ -37,7 +37,8 @@ import requests
 from Utilities_Main import (
     data_validation_metadata_generation,
     parse_request_data,
-    ScriptManagement
+    ScriptManagement,
+    FileManager
 )
 from Utilities_Architecture import (
     log_to_api,
@@ -75,13 +76,14 @@ def execute_script_stack():
     - JSON response containing the results of each script call.
     """
     script_start_time = time.time()
+    
     route_name = 'execute_script_stack'
     logging.debug(f'Starting {route_name} process.')
     id_script = 0  # Default id_script value
     id_run = None
     try:
         # Step 1: Parse the request data (supports JSON and YAML)
-        input_data = parse_request_data()
+        input_data = FileManager.load_yaml_from_request()
         input_data.setdefault("id_script", id_script)  # Ensure id_script is set
         input_data["script_start_time"] = script_start_time
 

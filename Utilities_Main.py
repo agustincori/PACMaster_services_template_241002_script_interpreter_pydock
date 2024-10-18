@@ -4,10 +4,16 @@ from Utilities_Architecture import log_to_api, arq_save_outcome_data, ArqValidat
 from Utilities_error_handling import exception_handler_decorator,ValidationError
 from flask import request
 import os
+import stat 
 import base64
 import json
+import logging
+
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'th3_s3cr3t_k3y')
+ALLOWED_EXTENSIONS = {'yaml', 'yml'}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # Maximum allowed size is 10 MB
+
 
 @exception_handler_decorator
 def compute_and_save(data, metadata, use_db=True):
@@ -221,15 +227,15 @@ def parse_request_data():
 class ScriptManagement:
     @staticmethod
     @exception_handler_decorator
-    def extract_script_data(input_data,metadata):
+    def extract_script_data(input_data, metadata):
         """
-        Extracts environment variables and script stack from input data.
+        Extracts environment variables and script stack from input data, and adds script_name from headers.
 
         Parameters:
         - input_data (dict): The input data containing common_data and stack_scripts.
 
         Returns:
-        - dict: A dictionary containing both env_variables and stack dictionaries.
+        - dict: A dictionary containing env_variables, stack_scripts, and script_name.
 
         Raises:
         - ValidationError: If 'common_data', 'stack_scripts', 'services', 'user', or 'password' are missing.
@@ -237,19 +243,31 @@ class ScriptManagement:
         env_variables = input_data.get("env_variables")
         stack_scripts = input_data.get("stack_scripts")
 
+        # Get the script_name from the header
+        script_name = request.headers.get("X-Script-Name", "default_script_name")  # Default value if header is not present
+
         if not stack_scripts:
             raise ValidationError("Invalid payload: 'stack_scripts' are required.")
 
-        # Create a single dictionary 'script' with both 'env_variables' and 'stack'
+        # Create a single dictionary 'script' with 'env_variables', 'stack_scripts', and 'script_name'
         script = {
             "env_variables": env_variables,
-            "stack_scripts": stack_scripts
+            "stack_scripts": stack_scripts,
+            "script_name": script_name
         }
 
+        arq_save_outcome_data(
+            metadata=metadata,
+            id_category=0,
+            id_type=0,
+            v_string=script_name  # Use the updated script dictionary
+        )
+
         # Log each parameter in 'env_variables'
-        for key, value in script['env_variables'].items():
-            log_message = f"env_variables parameter: {key} = {value}"
-            log_to_api(metadata, log_message=log_message, use_db=True)
+        if env_variables:
+            for key, value in script['env_variables'].items():
+                log_message = f"env_variables parameter: {key} = {value}"
+                log_to_api(metadata, log_message=log_message, use_db=True)
 
         # Log each parameter in 'stack_scripts'
         if isinstance(script['stack_scripts'], list):
@@ -257,7 +275,6 @@ class ScriptManagement:
                 log_message = f"stack_scripts item {index}: {item}"
                 log_to_api(metadata, log_message=log_message, use_db=True)
         else:
-            # Handle the case where it's not a list (if necessary)
             for key, value in script['stack_scripts'].items():
                 log_message = f"stack_scripts parameter: {key} = {value}"
                 log_to_api(metadata, log_message=log_message, use_db=True)
@@ -352,7 +369,95 @@ class ScriptManagement:
                     "error": error_message
                 })
         return results
+
+
+
+class FileManager:
+    @staticmethod
+    @exception_handler_decorator
+    def is_valid_filename(filename):
+        """
+        Verifies that the filename is safe and does not contain dangerous characters.
+        """
+        return os.path.basename(filename) == filename and '.' in filename and \
+               filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+    @staticmethod
+    @exception_handler_decorator
+    def check_file_size(file_path):
+        """
+        Checks that the file does not exceed the allowed maximum size.
+        """
+        if os.path.getsize(file_path) > MAX_FILE_SIZE:
+            raise ValueError(f"File {file_path} exceeds the maximum allowed size of {MAX_FILE_SIZE / (1024 * 1024)} MB.")
+
+    @staticmethod
+    @exception_handler_decorator
+    def check_file_permissions(file_path):
+        """
+        Verifies that the file does not have insecure permissions like public write or execute.
+        """
+        st = os.stat(file_path)
+        if st.st_mode & (stat.S_IWOTH | stat.S_IXOTH):  # Insecure permissions
+            raise PermissionError(f"File {file_path} has insecure permissions.")
+
+    @staticmethod
+    @exception_handler_decorator
+    def load_yaml_from_request():
+        """
+        Loads and processes the YAML file either from the provided X-Script-Name header (if specified) 
+        or from the POST request body directly.
+
+        Returns:
+            dict: The YAML file contents as a dictionary.
+        """
+        # Check if the X-Script-Name header is present
+        script_name = request.headers.get("X-Script-Name")
+        
+        if script_name:
+            # Case 1: Load the script from the /scripts directory
+            # Validate the filename is safe
+            if not FileManager.is_valid_filename(script_name):
+                raise ValueError(f"Invalid or dangerous file name: {script_name}")
+
+            # Define the secure path inside the container where YAML files are stored
+            file_path = os.path.join(".", "scripts", script_name)  # "./scripts/script_name.yaml"
+            file_path = os.path.normpath(file_path)
+            # Check if the file exists
+            if not os.path.exists(file_path):
+                raise FileNotFoundError(f"File {script_name} not found.")
+
+            # Check the file size
+            FileManager.check_file_size(file_path)
+
+            # Check the file permissions
+            #FileManager.check_file_permissions(file_path)
+
+            # Read and load the YAML file contents
+            try:
+                with open(file_path, 'r') as file:
+                    input_data = yaml.safe_load(file)
+            except yaml.YAMLError as e:
+                raise ValueError(f"Error loading YAML file: {str(e)}")
+
+            logging.info(f"File {script_name} loaded successfully by {request.remote_addr}")
+
+        else:
+            # Case 2: Load the YAML from the request body
+            if not request.data:
+                raise ValueError("No data found in request to load YAML content.")
+            try:
+                input_data = yaml.safe_load(request.data)
+            except yaml.YAMLError as e:
+                raise ValueError(f"Error loading YAML from request body: {str(e)}")
+
+            logging.info(f"YAML loaded successfully from request body by {request.remote_addr}")
+
+        return input_data
     
+
+
+
 @exception_handler_decorator
 def get_service_host_port(service_name):
     """
