@@ -94,6 +94,13 @@ def execute_script_stack():
         # Step 3: Log the start of the operation
         log_to_api(metadata, log_message=f'{route_name} starts.', use_db=use_db)
 
+        if use_db and id_run:
+            arq_save_outcome_data(
+                metadata=metadata,
+                id_category=0,
+                id_type=1,
+                v_string=input_data['original_yaml']
+        )
         # Step 4: Extract common_data and stack_scripts
         script = ScriptManagement.extract_script_data(input_data,metadata)
         

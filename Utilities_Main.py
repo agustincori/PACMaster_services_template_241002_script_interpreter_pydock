@@ -421,7 +421,7 @@ class FileManager:
                 raise ValueError(f"Invalid or dangerous file name: {script_name}")
 
             # Define the secure path inside the container where YAML files are stored
-            file_path = os.path.join(".", "scripts", script_name)  # "./scripts/script_name.yaml"
+            file_path = os.path.join(".", "scripts", script_name)
             file_path = os.path.normpath(file_path)
             # Check if the file exists
             if not os.path.exists(file_path):
@@ -430,13 +430,20 @@ class FileManager:
             # Check the file size
             FileManager.check_file_size(file_path)
 
-            # Check the file permissions
-            #FileManager.check_file_permissions(file_path)
-
             # Read and load the YAML file contents
             try:
                 with open(file_path, 'r') as file:
-                    input_data = yaml.safe_load(file)
+                    original_yaml = file.read()
+                    print("File contents:", original_yaml)  # Debugging statement
+                    input_data = yaml.safe_load(original_yaml)
+                    # Ensure input_data is a dictionary
+                    if not isinstance(input_data, dict):
+                        raise ValueError("Parsed YAML content is not a dictionary.")
+
+                    # Store the original YAML string in input_data
+                    input_data['original_yaml'] = original_yaml
+
+
             except yaml.YAMLError as e:
                 raise ValueError(f"Error loading YAML file: {str(e)}")
 
@@ -447,13 +454,17 @@ class FileManager:
             if not request.data:
                 raise ValueError("No data found in request to load YAML content.")
             try:
-                input_data = yaml.safe_load(request.data)
+                # Decode request data
+                request_text = request.data.decode('utf-8')
+                print("Request data:", request_text)  # Debugging statement
+                input_data = yaml.safe_load(request_text)
             except yaml.YAMLError as e:
                 raise ValueError(f"Error loading YAML from request body: {str(e)}")
 
             logging.info(f"YAML loaded successfully from request body by {request.remote_addr}")
 
         return input_data
+
     
 
 
