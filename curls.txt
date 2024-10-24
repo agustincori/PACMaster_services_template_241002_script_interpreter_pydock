@@ -12,4 +12,4 @@ Invoke-RestMethod -Uri http://localhost:10034/execute_script_stack -Method Post 
 
 ### ASI PARA PASAR DIRECTAMENTE EL FILE POR EL POST REQUEST ###
 
-Invoke-RestMethod -Uri http://localhost:10034/execute_script_stack -Method Post -ContentType "application/x-yaml" -Body (Get-Content -Path "./scripts/module.yaml" -Raw) -Headers @{ "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF91c2VyIjowLCJleHAiOjE3MjkyNjI1NzIsImlhdCI6MTcyOTE3NjE3Mn0.lMsZJQr32OF8pOIy4632x-IkvxOpO36t1WJ4v8PLWyc" }
+Invoke-RestMethod -Uri http://localhost:10034/execute_script_stack -Method Post -ContentType "application/x-yaml" -Body (Get-Content -Path "./scripts/service_math_test.yaml" -Raw) -Headers @{ "Authorization" = "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZF91c2VyIjowLCJleHAiOjE3Mjk3MDMxMDgsImlhdCI6MTcyOTYxNjcwOH0.lt6SzEjj4qQ4zuiC0Lw7D-2MxrZ-gULxPqXwbCiTAj8"; "X-Script-Name" = "service_math_test.yaml" }

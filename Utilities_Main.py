@@ -244,7 +244,7 @@ class ScriptManagement:
         stack_scripts = input_data.get("stack_scripts")
 
         # Get the script_name from the header
-        script_name = request.headers.get("X-Script-Name", "default_script_name")  # Default value if header is not present
+        script_name = request.headers.get("X-Script-Name", "### no_header ###")  # Default value if header is not present
 
         if not stack_scripts:
             raise ValidationError("Invalid payload: 'stack_scripts' are required.")
@@ -461,7 +461,9 @@ class FileManager:
 @exception_handler_decorator
 def get_service_host_port(service_name):
     """
-    This function returns the host:port for a given service.
+    Returns the host:port for a given service.
+
+    If the DEBUG environment variable is set to 'True', the function uses 'localhost' as the host.
 
     Args:
         service_name (str): The name of the service to search for (e.g., 'service_math').
@@ -472,24 +474,40 @@ def get_service_host_port(service_name):
     Raises:
         ValidationError: If the service is not found or is missing required parameters.
     """
-    # Debugging prints to check the values
+    # Check if debugging is enabled
+    debug_mode = os.getenv('DEBUG', 'True').lower() == 'true'
+    print(f"Debug mode: {debug_mode}")  # Debugging print
+
+    # Assuming service_data is globally available
     print(f"Service name: {service_name}")
-    print(f"Service data: {service_data}")  # Assuming service_data is globally available
+    print(f"Service data: {service_data}")
 
     # Parse service_arch if it's a string
     if isinstance(service_data['service_arch'], str):
         service_data['service_arch'] = json.loads(service_data['service_arch'])
 
-    # Use the global service_data
-    service_info = service_data.get('service_arch', {}).get(service_name)
-    
-    print(f"Service info retrieved: {service_info}")  # Debugging print to check service_info
+    # Get the service architecture dictionary
+    service_arch = service_data.get('service_arch', {})
 
-    if service_info and 'host' in service_info and 'port' in service_info:
-        return f"{service_info['host']}:{service_info['port']}"
-    
-    # If the service is not found or is missing 'host'/'port', raise a ValidationError
+    # Loop through the services to find the matching service name
+    for service_key, service_info in service_arch.items():
+        if service_key == service_name:
+            # Debugging print to check service_info
+            print(f"Service info retrieved: {service_info}")
+
+            if 'host' in service_info and 'port' in service_info:
+                host = 'localhost' if debug_mode else service_info['host']
+                port = service_info['port']
+                return f"{host}:{port}"
+            else:
+                # Missing 'host' or 'port' in the service info
+                raise ValidationError(
+                    message=f"Service '{service_name}' is missing 'host' or 'port' information.",
+                    details=f"The service '{service_name}' does not contain valid 'host' and 'port' keys."
+                )
+
+    # If the service is not found, raise a ValidationError
     raise ValidationError(
-        message=f"Service '{service_name}' not found or missing required parameters.",
-        details=f"The services stack does not contain valid host/port information for the requested service: '{service_name}'."
+        message=f"Service '{service_name}' not found.",
+        details=f"The services stack does not contain the requested service: '{service_name}'."
     )

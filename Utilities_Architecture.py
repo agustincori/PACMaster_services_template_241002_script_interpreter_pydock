@@ -35,19 +35,6 @@ db_manager_HOST = os.getenv('db_manager_HOST', 'localhost')
 db_manager_PORT = os.getenv('db_manager_PORT', '20083')
 BASE_URL = f'http://{db_manager_HOST}:{db_manager_PORT}'
 
-# Define the environment variable with the updated structure directly in the default argument
-service_arch = os.getenv("service_arch", '{"service_math": {"host": "localhost", "port": 10033}}')
-# Get environment variables or set default values
-service_name = os.getenv('SERVICE_NAME', '241002_script_interpreter_pydock')
-id_service = int(os.getenv('ID_SERVICE', 0))
-service_data = {
-    'service_name': service_name,
-    'id_service': id_service,
-    'service_arch': service_arch  # Añadir el diccionario service_arch
-}
-
-
-
 # Set the secret key from environment variables or use a default value
 SECRET_KEY = os.getenv('SECRET_KEY', 'th3_s3cr3t_k3y')
 
@@ -584,4 +571,30 @@ class ArqValidations:
 
 
 
+# URL to get the services
+get_services_url = f'{BASE_URL}/get_services'
+
+# Make the request to get the services data
+try:
+    service_arch = arq_handle_api_request(url=get_services_url, method='GET')
+    print("Service architecture obtained successfully.")
+except Exception as e:
+    print(f"Error obtaining services: {e}")
+    service_arch = {}
+
+# Validate and use service_arch
+if service_arch:
+    print("Contents of service_arch:")
+    print(json.dumps(service_arch, indent=2))
+else:
+    print("Could not obtain the service architecture.")
+
+# Get environment variables or set default values
+service_name = os.getenv('SERVICE_NAME', '241002_script_interpreter_pydock')
+id_service = int(os.getenv('ID_SERVICE', 0))
+service_data = {
+    'service_name': service_name,
+    'id_service': id_service,
+    'service_arch': service_arch  # Añadir el diccionario service_arch
+}
 

@@ -32,7 +32,6 @@ import os
 import logging
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-from waitress import serve
 import requests
 from Utilities_Main import (
     data_validation_metadata_generation,
@@ -112,7 +111,7 @@ def execute_script_stack():
         if use_db and id_run:
             arq_save_outcome_data(
                 metadata=metadata,
-                id_category=0,
+                id_category=1,
                 id_type=1,
                 v_integer=execution_time_ms
             )
@@ -121,6 +120,13 @@ def execute_script_stack():
         log_to_api(metadata, log_message=f"Total execution_time_ms={execution_time_ms}", use_db=use_db)
         log_to_api(metadata, log_message=f"{route_name} ends.", use_db=use_db)
 
+        if use_db and id_run:
+            arq_save_outcome_data(
+                metadata=metadata,
+                id_category=0,
+                id_type=12,
+                v_jsonb=results
+            )
         # Step 9: Update run fields and return the result
         success_status = 200
         ArqRuns.update_run_fields(metadata, status=success_status)
@@ -145,5 +151,6 @@ def summary():
     return render_template("index.html")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10034))  # Use port from environment variable or default to 10033
-    serve(app, host="0.0.0.0", port=port)
+    #port = int(os.environ.get("PORT", 10034))  # Use port from environment variable or default to 10033
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10034)), debug=True)  # Use this for local development only
+
