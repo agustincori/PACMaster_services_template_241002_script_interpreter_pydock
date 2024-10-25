@@ -131,7 +131,7 @@ def execute_script_stack():
             arq_save_outcome_data(
                 metadata=metadata,
                 id_category=0,
-                id_type=12,
+                id_type=2,
                 v_jsonb=results
             )
         # Step 9: Update run fields and return the result
