@@ -306,16 +306,24 @@ class ScriptManagement:
         stack_scripts = script["stack_scripts"]
 
         results = []
+        results_with_tags = {}  # Dictionary to store results by tag
 
-        # Execute each script in the stack
         for step_script in stack_scripts:
             service = step_script.get("service")
             endpoint = step_script.get("endpoint")
+            tag = step_script.get("tag")  # Get tag if it exists
             payload = step_script.get("payload")
+
+            # Replace environment variables
+            payload = ScriptManagement.replace_env_variables_in_payload(payload, env_variables)
+
+            # Replace tags with previous results if present
+            payload = ScriptManagement.replace_tags_in_payload(payload, results_with_tags)
+
+            # Proceed with setting metadata and executing the request
             payload["id_father_run"] = metadata.get("id_run")
             payload["id_father_service"] = service_data.get("id_service")
 
-            # Validate the script details
             if not service or not endpoint or payload is None:
                 raise ValidationError(f"Invalid script details in stack_scripts: {step_script}")
 
@@ -324,19 +332,23 @@ class ScriptManagement:
                 host_and_port = get_service_host_port(service)
                 # Construct the full URL
                 url = f"http://{host_and_port}{endpoint}"
-
+                
                 # Send the API request using the arq_handle_api_request method
                 response = arq_handle_api_request(url, payload=payload, metadata=metadata, method='POST')
 
-                # Collect the response data
+                # Collect the response and add it to results
                 result_data = {
                     "service": service,
                     "endpoint": endpoint,
                     "status_code": 200,  # Assuming the request was successful
                     "response": response
                 }
-
                 results.append(result_data)
+
+                # Save the result under the tag if it exists
+                if tag:
+                    # Store only the 'result' from response for future tag-based replacement
+                    results_with_tags[tag] = response.get('result')  # Only store result for tag replacement
 
                 # Log the successful execution
                 log_to_api(metadata, log_message=f"Executed {endpoint} on {service} with status 200.", use_db=use_db)
@@ -368,8 +380,51 @@ class ScriptManagement:
                     "endpoint": endpoint,
                     "error": error_message
                 })
+
         return results
 
+    @staticmethod
+    @exception_handler_decorator   
+    def replace_env_variables_in_payload(payload, env_variables):
+        """
+        Replaces placeholders in the payload with actual values from env_variables.
+
+        Parameters:
+        - payload (dict): The payload dictionary where placeholders need to be replaced.
+        - env_variables (dict): Dictionary of environment variables and their values.
+
+        Returns:
+        - dict: Updated payload with values replaced.
+        """
+        updated_payload = {}
+        for key, value in payload.items():
+            # If the value is a string and matches a key in env_variables, replace it
+            if isinstance(value, str) and value in env_variables:
+                updated_payload[key] = env_variables[value]
+            else:
+                updated_payload[key] = value  # Keep original value if no match
+        return updated_payload
+
+    @staticmethod
+    def replace_tags_in_payload(payload, results_with_tags):
+        """
+        Replaces tag references in the payload with actual values from results_with_tags.
+
+        Parameters:
+        - payload (dict): The payload dictionary where tag references need to be replaced.
+        - results_with_tags (dict): Dictionary of results from previous scripts, keyed by tag.
+
+        Returns:
+        - dict: Updated payload with values replaced.
+        """
+        updated_payload = {}
+        for key, value in payload.items():
+            # If the value is a string and matches a tag in results_with_tags, replace it
+            if isinstance(value, str) and value in results_with_tags:
+                updated_payload[key] = results_with_tags[value]
+            else:
+                updated_payload[key] = value  # Keep original value if no match
+        return updated_payload
 
 
 class FileManager:
@@ -474,7 +529,12 @@ def get_service_host_port(service_name):
     """
     Returns the host:port for a given service.
 
-    If the DEBUG environment variable is set to 'True', the function uses 'localhost' as the host.
+    - If running inside a Docker container and DEBUG is True:
+        Uses 'host.docker.internal' to reach services on the host machine.
+    - If running on the host machine and DEBUG is True:
+        Uses 'localhost' as the host.
+    - If DEBUG is False:
+        Uses the host specified in service_info.
 
     Args:
         service_name (str): The name of the service to search for (e.g., 'service_math').
@@ -507,7 +567,16 @@ def get_service_host_port(service_name):
             print(f"Service info retrieved: {service_info}")
 
             if 'host' in service_info and 'port' in service_info:
-                host = 'localhost' if debug_mode else service_info['host']
+                if debug_mode:
+                    # Determine if running inside Docker
+                    if os.path.exists('/.dockerenv'):
+                        # Inside Docker container
+                        host = 'host.docker.internal'
+                    else:
+                        # Running on the host machine
+                        host = 'localhost'
+                else:
+                    host = service_info['host']
                 port = service_info['port']
                 return f"{host}:{port}"
             else:
