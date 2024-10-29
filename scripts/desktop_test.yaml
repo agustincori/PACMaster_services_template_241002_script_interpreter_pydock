@@ -1,0 +1,8 @@
+env_variables:
+  folder_name: test_000
+stack_scripts:
+  - service: "service_desktop"
+    endpoint: "/create_directory"
+    payload:
+      path: "C:/temp"
+      name: nuevo_folder_script_intr
