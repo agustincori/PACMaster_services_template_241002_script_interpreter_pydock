@@ -469,7 +469,7 @@ class FileManager:
         # Check if the X-Script-Name header is present
         script_name = request.headers.get("X-Script-Name")
         
-        if script_name:
+        if script_name and False:
             # Case 1: Load the script from the /scripts directory
             # Validate the filename is safe
             if not FileManager.is_valid_filename(script_name):
@@ -510,9 +510,12 @@ class FileManager:
                 raise ValueError("No data found in request to load YAML content.")
             try:
                 # Decode request data
-                request_text = request.data.decode('utf-8')
-                print("Request data:", request_text)  # Debugging statement
-                input_data = yaml.safe_load(request_text)
+                original_yaml  = request.data.decode('utf-8')
+                print("Request data:", original_yaml)  # Debugging statement
+                input_data = yaml.safe_load(original_yaml)
+                if not isinstance(input_data, dict):    #Ensure input_data is a dictionary
+                    raise ValueError("Parsed YAML content is not a dictionary.")
+                input_data['original_yaml'] = original_yaml # Store the original YAML string within the dictionary
             except yaml.YAMLError as e:
                 raise ValueError(f"Error loading YAML from request body: {str(e)}")
 

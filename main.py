@@ -134,8 +134,9 @@ def execute_script_stack():
                 id_type=2,
                 v_jsonb=results
             )
-        # Step 9: Update run fields and return the result
-        success_status = 200
+        # Step 9: Check for errors in results and set success_status accordingly
+        success_status = 500 if any('error' in result for result in results) else 200
+        
         ArqRuns.update_run_fields(metadata, status=success_status)
         return jsonify(result_output), success_status
 

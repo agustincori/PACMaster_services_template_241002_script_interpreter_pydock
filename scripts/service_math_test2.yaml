@@ -1,0 +1,221 @@
+env_variables:
+  reused_var: bcd
+  input_arg1: 1
+  input_arg2: 2
+stack_scripts:
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: sum
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: diff
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: mult
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: div      
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"  
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: pwr           
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: root             
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: sum
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: diff
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: mult
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: div      
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"  
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: pwr           
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: root             
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: sum
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: diff
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: mult
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: div      
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"  
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: pwr           
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: root             
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: sum
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: diff
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: mult
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: div      
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"  
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: pwr           
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: root             
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: sum
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: diff
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: mult
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: div      
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"  
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: pwr           
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: root             
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: sum
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: diff
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: mult
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: div      
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"  
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: pwr           
+  - service: "service_math"
+    endpoint: "/arithmetic_operation"
+    payload:
+      arg1: 1
+      arg2: 2
+      operation: root             
